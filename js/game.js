@@ -70,7 +70,7 @@ function lightHour(tod, at) {
 }
 
 // ---------------------------------------------------------------- the save
-const S = (() => { const fresh = { keys: { qing: true, zhu: false, bai: false, xuan: false }, skills: { double: false, glide: false, climb: false }, flags: {}, pages: {}, bells: {}, beaten: {}, who: 'yirui', pos: null, tod: 0.3, coins: 0, items: {}, opened: {}, stations: {}, shrine: null, world: 2 };
+const S = (() => { const fresh = { keys: { qing: true, zhu: false, bai: false, xuan: false }, skills: { double: false, glide: false, climb: false }, flags: {}, pages: {}, bells: {}, beaten: {}, who: 'yirui', pos: null, tod: 0.3, coins: 0, items: {}, opened: {}, stations: {}, shrine: null, treasures: {}, cracked: {}, world: 2 };
   try { const s = JSON.parse(localStorage.getItem('jianghu.save') || 'null'); if (s && !q.has('new') && s.world === 2) return { ...fresh, ...s, keys: { ...fresh.keys, ...s.keys }, skills: { ...fresh.skills, ...s.skills }, flags: { ...s.flags } }; } catch (e) { /* */ }
   return fresh; })();
 let saveT = 0; const save = () => { try { localStorage.setItem('jianghu.save', JSON.stringify(S)); } catch (e) { /* */ } };
@@ -100,8 +100,11 @@ for (const t of TH) {
   if (t.type === 'dummy') { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.3, 10), std('#6a4428')); post.position.y = 0.65; const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.5, 12), std('#a8783e')); body.position.y = 0.95; const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.07, 0.07), std('#6a4428')); arm.position.y = 1.0; const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8), std('#c89a5a')); head.position.y = 1.35; g.add(post, body, arm, head); t.body = body; t.hits = 0; for (const m of g.children) m.castShadow = true; }
   if (t.type === 'item') { if (S.items[t.id] || S.flags[t.id === 'hairpin' ? 'pinQuest' : 'hawsQuest'] === 'given') { t.gone = true; g.visible = false; } const m = t.id === 'hairpin' ? new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 6), std('#3ab08a', { emissive: '#1a6a4a' })) : new THREE.Mesh(geo.crate, std('#d8382a')); m.position.y = 0.3; if (t.id === 'hairpin') m.rotation.z = 1.1; const glow = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffe8a0', transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })); glow.position.y = 0.3; g.add(m, glow); }
   if (t.type === 'animal') { t.home = [t.x, t.z]; t.vx = t.vz = 0; t.yaw = Math.random() * 6.28; t.t = Math.random() * 5; const body = makeAnimal(t.kind); g.add(body); t.body = body; }
+  if (t.type === 'treasure') { if (S.treasures[t.id]) { t.gone = true; g.visible = false; } const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 1), std(t.c, { emissive: t.c, emissiveIntensity: 0.6, roughness: 0.25 })); m.position.y = 0.35; const glow = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), new THREE.MeshBasicMaterial({ color: t.c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false })); glow.position.y = 0.35; g.add(m, glow); t.orb = m; t.glow = glow; }
+  if (t.type === 'crack' && S.cracked[t.id]) { for (const [x, y, z] of t.cells) V.set(x, y, z, B.AIR); V.touch(t.cells[0][0], t.cells[0][2]); V.touch(t.cells[8][0], t.cells[8][2]); t.broken = true; t.done = true; }
   if (t.type === 'station') { const board = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.05), std('#e8dcbc')); board.position.set(0, 1.2, 0); g.add(board); }
 }
+V.flush();
 function makeAnimal(kind) { // a few bricks each
   const G = new THREE.Group(), b = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), std(c)); m.position.set(x, y, z); m.castShadow = true; G.add(m); return m; };
   if (kind === 'chicken') { b(0.24, 0.2, 0.3, '#f4f0e6', 0, 0.2, 0); b(0.14, 0.16, 0.14, '#f4f0e6', 0, 0.36, 0.14); b(0.04, 0.06, 0.08, '#d8302a', 0, 0.47, 0.14); b(0.06, 0.04, 0.06, '#f0a838', 0, 0.36, 0.23); b(0.03, 0.1, 0.03, '#f0a838', 0.06, 0.05, 0); b(0.03, 0.1, 0.03, '#f0a838', -0.06, 0.05, 0); }
@@ -117,7 +120,11 @@ function smash(t) { // a jar or a crate broken: shards, and what was in it
   for (let i = 0; i < 14; i++) fx.puff(thingAt(t).add(V3(0, 0.3, 0)), V3((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4), 0.6, t.type === 'jar' ? [0.8, 0.5, 0.3] : [0.9, 0.7, 0.4], 2, 6);
   const r = Math.random(); drop('coin', t, 1 + Math.floor(Math.random() * 3)); if (r < 0.15) drop('bun', t); else if (r < 0.25) drop('gourd', t);
 }
-function hitThings(from, reach, arc, yaw) { for (const t of TH) { if ((t.type !== 'jar' && t.type !== 'crate' && t.type !== 'dummy') || t.broken) continue; const dx = t.x - from.x, dz = t.z - from.z, d = Math.hypot(dx, dz); if (d > reach + 0.4 || Math.abs(t.y - from.y) > 2.5) continue; if (arc != null && Math.abs(angWrap(Math.atan2(dx, dz) - yaw)) > arc) continue; if (t.type === 'dummy') { t.hits++; t.wob = 1; SFX.thud(0.4); toast(T(`木人樁：${t.hits} 下`, `Dummy: ${t.hits} hits`)); } else smash(t); } }
+function breakWall(t) { // the cracked stone falls: dust, rubble, the way in
+  t.broken = true; t.done = true; S.cracked[t.id] = true; for (const [x, y, z] of t.cells) { V.set(x, y, z, B.AIR); for (let i = 0; i < 5; i++) fx.puff(V3(x + 0.5, y + 0.5, z + 0.5).multiplyScalar(VS), V3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3), 1.2, [0.55, 0.5, 0.45], 2, 5); }
+  V.touch(t.cells[0][0], t.cells[0][2]); V.touch(t.cells[8][0], t.cells[8][2]); V.flush(); fx.S.shake = 0.35; SFX.thud?.(1); SFX.hit?.(0.8); banner(T('石壁崩開了！', 'The wall gives way!'), '#ffe8a0', T('後面是一條密道', 'A hidden passage lies behind it')); save();
+}
+function hitThings(from, reach, arc, yaw) { for (const t of TH) { if ((t.type !== 'jar' && t.type !== 'crate' && t.type !== 'dummy' && t.type !== 'crack') || t.broken) continue; const dx = t.x - from.x, dz = t.z - from.z, d = Math.hypot(dx, dz); if (d > reach + 0.4 || Math.abs(t.y - from.y) > 2.5) continue; if (arc != null && Math.abs(angWrap(Math.atan2(dx, dz) - yaw)) > arc) continue; if (t.type === 'crack') breakWall(t); else if (t.type === 'dummy') { t.hits++; t.wob = 1; SFX.thud(0.4); toast(T(`木人樁：${t.hits} 下`, `Dummy: ${t.hits} hits`)); } else smash(t); } }
 function stepThings(dt) {
   for (let i = drops.length - 1; i >= 0; i--) { const d = drops[i]; d.t += dt; d.vy -= 20 * dt; d.x += d.vx * dt; d.z += d.vz * dt; d.y += d.vy * dt; const gy = V.top(Math.floor(d.x), Math.floor(d.z)); if (d.y < gy) { d.y = gy; d.vy = Math.abs(d.vy) * 0.3; d.vx *= 0.6; d.vz *= 0.6; } d.m.position.set(d.x * VS, (d.y + 0.15) * VS, d.z * VS); d.m.rotation.y += dt * 4; if (d.kind === 'coin') d.m.rotation.x = Math.PI / 2;
     const pd = Math.hypot(d.x - me.x, d.z - me.z); if (d.t > 0.4 && pd < 3 && Math.abs(d.y - me.y) < 3) { d.vx += (me.x - d.x) * dt * 30; d.vz += (me.z - d.z) * dt * 30; } // drawn to you
@@ -125,6 +132,11 @@ function stepThings(dt) {
   for (const t of TH) {
     if (t.broken) { t.respawn -= dt; if (t.respawn < 0 && Math.hypot(t.x - me.x, t.z - me.z) > 40) { t.broken = false; t.g.visible = true; } continue; }
     if (t.type === 'dummy' && t.wob > 0) { t.wob = Math.max(0, t.wob - dt * 2); t.g.rotation.z = Math.sin(t.wob * 20) * 0.2 * t.wob; }
+    if (t.type === 'crack' && !t.done && Math.random() < dt * 3 && Math.hypot(t.x - me.x, t.z - me.z) < 14) fx.puff(V3(t.x + (Math.random() - 0.5) * 3, t.y + Math.random() * 3, t.z).multiplyScalar(VS), V3(0, -0.4, 0), 0.6, [0.6, 0.55, 0.5], 1, 2);
+    if (t.type === 'treasure' && !t.gone) { t.orb.rotation.y += dt * 1.2; t.orb.position.y = 0.35 + Math.sin(G.clock * 2) * 0.06; t.glow.material.opacity = 0.25 + Math.sin(G.clock * 3) * 0.08;
+      if (Math.hypot(t.x - me.x, t.z - me.z) < 1.3 && Math.abs(t.y - me.y) < 2.2) { t.gone = true; t.g.visible = false; S.treasures[t.id] = true; recalcMax(); player.hp = player.maxHp; player.qi = player.maxQi; const n = Object.keys(S.treasures).length;
+        for (let i = 0; i < 30; i++) fx.puff(V3(t.x, t.y + 0.5, t.z).multiplyScalar(VS), V3((Math.random() - 0.5) * 3, 1 + Math.random() * 2, (Math.random() - 0.5) * 3), 1, [1.2, 1.1, 0.7], 1, -1);
+        banner(T(`得到 ${t.zh}！`, `Found: ${t.en}!`), '#ffe8a0', t.gives === 'hp' ? T(`氣血上限 +1 格・秘洞寶物 ${n}/8`, `One more heart · cave treasures ${n}/8`) : T(`內力上限 +1・秘洞寶物 ${n}/8`, `More qi · cave treasures ${n}/8`)); SFX.gong(1); save(); hud(); } }
     if (t.type === 'item' && !t.gone) { t.g.rotation.y += dt * 1.5; if (Math.hypot(t.x - me.x, t.z - me.z) < 1.2 && Math.abs(t.y - me.y) < 2) { t.gone = true; t.g.visible = false; S.items[t.id] = true; banner(T(`找到 ${ITEMS[t.id].zh}`, `Found the ${ITEMS[t.id].en}`), '#ffe8a0'); SFX.gong(0.5); save(); } }
     if (t.type === 'animal') stepAnimal(t, dt);
   }
@@ -154,7 +166,7 @@ heroes.yirui.special = YIDAO; heroes.yishuo.special = XUANFENG;
 let me = heroes[S.who] || heroes.yirui, mate = me === heroes.yirui ? heroes.yishuo : heroes.yirui;
 const start = S.pos || Wd.spots.startP; for (const h of [me, mate]) { h.x = start.x; h.y = start.y + 0.2; h.z = start.z + (h === mate ? 1.2 : 0); }
 const player = { hp: 6, maxHp: 6, qi: 3, maxQi: 3, inv: 0, jumps: 0, climbT: 0, dead: 0, trail: [] };
-const recalcMax = () => { const n = Object.keys(S.pages).length; player.maxHp = 6 + 2 * Math.floor(n / 5); player.maxQi = 3 + Math.floor(n / 10); };
+const recalcMax = () => { const n = Object.keys(S.pages).length; const tr = TH.filter((t) => t.type === 'treasure' && S.treasures[t.id]); player.maxHp = 6 + 2 * Math.floor(n / 5) + 2 * tr.filter((t) => t.gives === 'hp').length; player.maxQi = 3 + Math.floor(n / 10) + tr.filter((t) => t.gives === 'qi').length; };
 recalcMax(); player.hp = player.maxHp;
 const npcs = Wd.npcs.map((n) => makeFigure(n.cast, { ...n, npc: n.id }));
 const foes = [];
@@ -225,6 +237,7 @@ function pollPad(dt) {
   wheel += ((gp.buttons[6]?.value || 0) - (gp.buttons[7]?.value || 0)) * 900 * dt;
   for (const [i, code] of Object.entries(PADKEYS)) { const now = b(+i); if (now && !pad.prev[i]) { keys[code] = true; keys['_' + code] = true; } if (!now && pad.prev[i]) keys[code] = false; pad.prev[i] = now; }
   if (b(0)) keys.Space = true; // held, for gliding and swimming up
+  const dir = pad.mz < -0.55 ? -1 : pad.mz > 0.55 ? 1 : 0; if (dir && dir !== pad.dir) keys[dir < 0 ? '_ArrowUp' : '_ArrowDown'] = true; pad.dir = dir; // the d-pad or stick, a step at a time in a menu
 }
 addEventListener('gamepadconnected', () => { wake(); music.start(); });
 // ---------------------------------------------------------------- the camera
@@ -377,9 +390,11 @@ const G = {
 // ---------------------------------------------------------------- a choice to make: a list, picked with up/down and use (or a click)
 let choice = null;
 function choose(title, items) { // items: [{ label, sub, run }]
+  for (const k of ['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown', 'KeyE', 'Space', 'Enter', 'KeyJ']) keys['_' + k] = false;
   choice = { items: [...items, { label: T('離開', 'Leave'), run: () => {} }], i: 0 }; $('ch').hidden = false; $('chT').textContent = title; drawChoice();
 }
 function drawChoice() { $('chL').innerHTML = choice.items.map((it, i) => `<button data-i="${i}" class="${i === choice.i ? 'on' : ''}">${it.label}${it.sub ? `<small>${it.sub}</small>` : ''}</button>`).join(''); }
+$('ch').addEventListener('mousemove', (e) => { const b = e.target.closest('[data-i]'); if (b && choice && choice.i !== +b.dataset.i) { choice.i = +b.dataset.i; drawChoice(); } });
 $('ch').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { choice.i = +b.dataset.i; pick(); } });
 function pick() { const it = choice.items[choice.i]; choice = null; $('ch').hidden = true; it.run(); hud(); save(); }
 G.shop = (goods) => choose(T(`你有 ${S.coins} 文`, `You have ${S.coins} coins`), goods.map((g) => ({ label: `${GOODS[g.id][lang]}　${g.price} ${T('文', 'coins')}`, sub: GOODS[g.id].what[lang], run: () => {

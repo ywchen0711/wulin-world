@@ -6,12 +6,12 @@
 import * as THREE from '../lib/three.module.min.js';
 
 export const VS = 0.6; // a brick, in world units (a minifig stands 1.5)
-export const B = { AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WATER: 5, WOOD: 6, PLANK: 7, ROOF: 8, WALL: 9, RED: 10, GOLD: 11, BAMBOO: 12, LEAF: 13, LEAF2: 14, PATH: 15, GREY: 16, BLOSSOM: 17, MOSS: 18, CLIFF: 19, GLOW: 20, DARK: 21, SNOW: 22, JADE: 23, PAPER: 24, REED: 25, BAMLEAF: 26, CLAY: 27, RUST: 28, MAPLE: 29 };
+export const B = { AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WATER: 5, WOOD: 6, PLANK: 7, ROOF: 8, WALL: 9, RED: 10, GOLD: 11, BAMBOO: 12, LEAF: 13, LEAF2: 14, PATH: 15, GREY: 16, BLOSSOM: 17, MOSS: 18, CLIFF: 19, GLOW: 20, DARK: 21, SNOW: 22, JADE: 23, PAPER: 24, REED: 25, BAMLEAF: 26, CLAY: 27, RUST: 28, MAPLE: 29, CRACK: 30 };
 export const COLOR = {
   [B.GRASS]: '#5a9a3e', [B.DIRT]: '#8a6440', [B.STONE]: '#8a8a86', [B.SAND]: '#d8c48a', [B.WATER]: '#3a7ab8', [B.WOOD]: '#5a3a24', [B.PLANK]: '#9a6a3e', [B.ROOF]: '#30343e',
   [B.WALL]: '#e6e0d2', [B.RED]: '#b0281e', [B.GOLD]: '#d8a838', [B.BAMBOO]: '#7ab048', [B.LEAF]: '#2e6e34', [B.LEAF2]: '#3e8a3a', [B.PATH]: '#a89c84', [B.GREY]: '#6e6e6a',
   [B.BLOSSOM]: '#f0a8c0', [B.MOSS]: '#4a6a34', [B.CLIFF]: '#b0644a', [B.GLOW]: '#ffcf70', [B.DARK]: '#2a2a2e', [B.SNOW]: '#f2f4f6', [B.JADE]: '#3ab08a', [B.PAPER]: '#f0e6cc',
-  [B.REED]: '#a8b060', [B.BAMLEAF]: '#5aa040', [B.CLAY]: '#b8683e', [B.RUST]: '#8a4030', [B.MAPLE]: '#d8582a',
+  [B.REED]: '#a8b060', [B.BAMLEAF]: '#5aa040', [B.CLAY]: '#b8683e', [B.RUST]: '#8a4030', [B.MAPLE]: '#d8582a', [B.CRACK]: '#857a6a',
 };
 export const SOLID = (b) => b !== B.AIR && b !== B.WATER && b !== B.REED;
 const SEE = (b) => b === B.AIR || b === B.WATER || b === B.REED || b === B.GLOW; // faces next to these are drawn

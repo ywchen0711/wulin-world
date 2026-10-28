@@ -8,6 +8,8 @@
 //   goal              the village kids' football goal
 //   item              a lost thing for a side quest
 //   animal            chickens, ducks, deer, cranes
+//   crack             a cracked stone wall sealing a secret cave: strike it and it falls
+//   treasure          a rare thing deep in a secret cave: more health (a heart) or more qi for good
 import { B } from './voxel.js';
 
 export function furnish(C) {
@@ -75,6 +77,53 @@ export function furnish(C) {
     put({ type: 'item', id: 'haws', x: cx - 1.5, y, z: cz + 3.5 });
     for (const [dx, dz] of [[-4, 0], [-2, 4], [0, -4], [10, 0]]) foes.push({ cast: R() < 0.5 ? 'daoba' : 'shouhou', x: cx + dx + 0.5, y, z: cz + dz + 0.5, home: [cx + dx + 0.5, cz + dz + 0.5], hp: 4, team: 'heifeng' });
     signs.push({ x: cx + 33, z: cz + 3, text: { zh: '黑風洞：生人勿近。', en: 'Black Wind Cave: strangers keep out.' } }); }
+  // ---------------------------------------------------------------- 秘洞 eight secret caves in the hillsides, one in each part of the land: a tunnel
+  // into the hill (half of them sealed with a cracked wall to strike down, the others behind a curtain of vines), a lamp-lit
+  // chamber, and on a golden stand a rare thing that adds a heart of health or a measure of qi for good
+  const TREASURES = [
+    { gives: 'hp', zh: '千年人參', en: 'Thousand-year ginseng', c: '#e8c070' }, { gives: 'qi', zh: '九轉金丹', en: 'Nine-turn golden elixir', c: '#f0c030' },
+    { gives: 'hp', zh: '天山雪蓮', en: 'Tianshan snow lotus', c: '#f4f6ff' }, { gives: 'qi', zh: '菩提子', en: 'Bodhi seed', c: '#a8783e' },
+    { gives: 'hp', zh: '血靈芝', en: 'Blood lingzhi', c: '#c0282a' }, { gives: 'qi', zh: '寒玉髓', en: 'Cold jade marrow', c: '#7ad8e8' },
+    { gives: 'hp', zh: '朱果', en: 'Vermilion fruit', c: '#f05a2a' }, { gives: 'qi', zh: '紫府靈液', en: 'Purple essence', c: '#b05aff' },
+  ];
+  const named = Object.values(P).filter((v) => typeof v[0] === 'number'), caves = [];
+  const clearOf = (x, z) => named.every((p) => dist(x, z, p) > 44) && caves.every((c) => dist(x, z, c) > 70);
+  for (let s = 0; s < 8; s++) {
+    const sx = (s % 4) * (W / 4), sz = Math.floor(s / 4) * (D / 2); let found = null;
+    for (let k = 0; k < 3000 && !found; k++) {
+      const fx = Math.floor(sx + 20 + R() * (W / 4 - 40)), fz = Math.floor(sz + 20 + R() * (D / 2 - 40)), [dx, dz] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(R() * 4)];
+      const y0 = Hm[fz * W + fx], h = (i) => Hm[(fz - dz * i) * W + (fx - dx * i)];
+      if (y0 <= WL + 1 || isRoad[fz * W + fx] || V.top(fx, fz) !== y0 || !clearOf(fx, fz)) continue;
+      const cx = fx - dx * 16, cz = fz - dz * 16; if (Math.min(cx, cz, fx, fz) < 70 || Math.max(cx, fx) >= W - 70 || Math.max(cz, fz) >= D - 70) continue;
+      if (h(3) < y0 + 4 || h(8) < y0 + 7 || h(16) < y0 + 9 || h(12) < y0 + 8) continue;
+      found = { fx, fz, dx, dz, y0, cx, cz };
+    }
+    for (let k = 0; k < 40000 && !found; k++) { // no hill here to dig into: raise a rocky one (anywhere, if this part has no room)
+      const any = k >= 20000, cx = Math.floor(any ? 70 + R() * (W - 140) : sx + 50 + R() * (W / 4 - 100)), cz = Math.floor(any ? 70 + R() * (D - 140) : sz + 50 + R() * (D / 2 - 100)); if (!clearOf(cx, cz)) continue;
+      let ok = true, y0 = Hm[cz * W + cx]; for (let z = cz - 16; z <= cz + 16 && ok; z += 4) for (let x = cx - 16; x <= cx + 16; x += 4) { const h = Hm[z * W + x]; if (h <= WL + 1 || isRoad[z * W + x] || Math.abs(h - y0) > 7) { ok = false; break; } }
+      if (!ok) continue; const [dx, dz] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(R() * 4)];
+      for (let z = cz - 17; z <= cz + 17; z++) for (let x = cx - 17; x <= cx + 17; x++) {
+        const r = Math.hypot(x - cx, z - cz) + R() * 1.5; if (r > 16) continue; const ht = y0 + Math.round(13 * Math.min(1, (16 - r) / 9)), g = Hm[z * W + x];
+        for (let y = g; y < y0 + 16; y++) if (V.get(x, y, z) !== B.AIR && y >= g) V.set(x, y, z, B.AIR); // trees and all
+        for (let y = Math.min(g, y0) - 1; y < ht; y++) V.set(x, y, z, y === ht - 1 ? (R() < 0.6 ? B.GRASS : B.MOSS) : y > ht - 3 && R() < 0.5 ? B.DIRT : B.STONE);
+        if (ht > y0 + 3 && R() < 0.04) V.set(x, ht, z, B.GREY);
+      }
+      found = { fx: cx + dx * 16, fz: cz + dz * 16, dx, dz, y0, cx, cz };
+    }
+    if (!found) { console.warn('no secret cave in part', s); continue; } const { fx, fz, dx, dz, y0, cx, cz } = found, px = dz, pz = dx, i = caves.length; caves.push([fx, fz]);
+    for (let y = y0 - 1; y <= y0 + 5; y++) for (let z = cz - 5; z <= cz + 5; z++) for (let x = cx - 5; x <= cx + 5; x++) if (V.get(x, y, z) === B.AIR) V.set(x, y, z, B.STONE); // a shell, wherever the hill is thin
+    box(cx - 4, y0, cz - 4, cx + 4, y0 + 4, cz + 4, B.AIR); box(cx - 4, y0 - 1, cz - 4, cx + 4, y0 - 1, cz + 4, B.STONE);
+    for (let j = 0; j <= 12; j++) { const x = fx - dx * j, z = fz - dz * j; for (let w = -1; w <= 1; w++) { box(x + px * w, y0, z + pz * w, x + px * w, y0 + 2, z + pz * w, B.AIR); V.set(x + px * w, y0 - 1, z + pz * w, B.STONE); } if (j % 5 === 4) V.set(x + px * 1, y0 + 2, z + pz * 1, B.GLOW); }
+    for (const [ax, az] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) V.set(cx + ax, y0 + 3, cz + az, B.GLOW);
+    for (let k = 0; k < 14; k++) { const x = cx - 4 + Math.floor(R() * 9), z = cz - 4 + Math.floor(R() * 9); if (Math.abs(x - cx) + Math.abs(z - cz) > 2) V.set(x, y0 + 4, z, B.STONE); } // the dripping stone of the roof
+    for (let k = 0; k < 20; k++) V.set(cx - 4 + Math.floor(R() * 9), y0 - 1, cz - 4 + Math.floor(R() * 9), B.MOSS);
+    box(cx - 1, y0, cz - 1, cx + 1, y0, cz + 1, B.STONE); V.set(cx, y0 + 1, cz, B.GOLD); // the stand
+    const t = TREASURES[i]; put({ type: 'treasure', id: 'tr' + i, x: cx + 0.5, y: y0 + 2, z: cz + 0.5, mouth: [fx, fz], dir: [dx, dz], ...t });
+    chest(cx - 3 * px - 3 * dx, cz - 3 * pz - 3 * dz, R() < 0.5 ? 'page' : 'coins', y0);
+    if (i % 2 === 0) { const cells = []; for (let w = -1; w <= 1; w++) for (let y = y0; y <= y0 + 2; y++) { const x = fx - dx * 2 + px * w, z = fz - dz * 2 + pz * w; V.set(x, y, z, B.CRACK); cells.push([x, y, z]); } put({ type: 'crack', id: 'k' + i, x: fx - dx * 2 + 0.5, y: y0, z: fz - dz * 2 + 0.5, cells }); }
+    else for (let w = -1; w <= 1; w++) for (let y = y0; y <= y0 + 2; y++) V.set(fx + px * w, y, fz + pz * w, B.REED); // vines over the mouth
+    if (i >= 2) for (const [ax, az] of [[2, -2], [-2, 2]]) foes.push({ cast: R() < 0.5 ? 'daoba' : 'shouhou', x: cx + ax + 0.5, y: y0, z: cz + az + 0.5, home: [cx + ax + 0.5, cz + az + 0.5], hp: 5, team: 'cave' + i });
+  }
   // ---------------------------------------------------------------- the village: a football pitch with a goal, the kids
   { const [vx, vz] = P.village, gx = vx + 44, gz = vz - 12, y = G0;
     for (let z = gz - 14; z <= gz + 3; z++) for (let x = gx - 8; x <= gx + 8; x++) { for (let k = 0; k < y; k++) if (V.get(x, k, z) === 0 || V.get(x, k, z) === B.WATER) V.set(x, k, z, B.DIRT); box(x, y, z, x, y + 20, z, B.AIR); V.set(x, y - 1, z, ((x + z) % 2) ? B.MOSS : B.GRASS); } // a level pitch, cleared

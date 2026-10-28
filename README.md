@@ -69,6 +69,8 @@ Pavilion**, where the truth is kept.
   - Beat the village kids at football (three goals in a minute).
   - Find 大嬸's jade hairpin in the plum grove and the pedlar's stolen crate in the Black Wind Cave.
   - Chickens, ducks, deer and cranes live about the land and run from you.
+  - Eight secret caves (秘洞) are hidden in hillsides all over the land. Half are sealed by a cracked stone wall that sheds dust as you come near (strike it down); the others sit behind a curtain of vines. Deep inside, on a golden stand, lies a rare thing: ginseng, snow lotus, blood lingzhi and vermilion fruit each give one more heart; the golden elixir, bodhi seed, cold jade marrow and purple essence each give more qi for your special moves. Some caves are guarded.
+  - Menus (shops, post stations) can be worked with the arrow keys or W/S, the d-pad or left stick, or the mouse.
 - **More.** A day passes in about ten minutes, with dawn, day, dusk and starry nights. Each place has its own ambient
   sound and the music is a plucked zither. There is a map (M). The game saves itself, and there is Chinese and English.
 - **Controls:** WASD to move, Space to jump, J or left click to hit, K or right click for the special, E to talk or
