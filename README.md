@@ -1,0 +1,70 @@
+# 武林積木：龍門江湖 · Wulin Bricks: The Rivers and Lakes of Longmen
+
+An open-world 3D adventure in the spirit of Leaf Leap, set in the world of the Wulin Bricks series 《龍門雙奕》
+*The Longmen Brothers*. The whole land is built of LEGO-like bricks, studs and all.
+
+**Play:** https://ywchen0711.github.io/wulin-world/
+
+## The story
+
+Their father has been framed for the murder of the Alliance chief and thrown in jail. The brothers Yi Rui (a young
+swordsman) and Yi Shuo (his little brother, who fights with a football) are on the run. The jade in Yi Shuo's ball is
+one of the four **Stratagem Keys**. Behind the great falls in the north, the four keys open the **Stratagem
+Pavilion**, where the truth is kept.
+
+## The land (400 × 400 bricks)
+
+| Place | What is there |
+|-------|---------------|
+| 龍門刀莊 Longmen Manor | sealed by the Law Hall since the night of the murder; the main hall, the guest pavilion |
+| 龍門村 Longmen Village | little houses, a well, fields |
+| 聽雨樓 the teahouse, crossroads town | Master Bai the storyteller, a market street |
+| 竹林 Bamboo Forest | bamboo everywhere, a stone tablet in a clearing |
+| 寒江閣 Cold River Pavilion | on an island in the lake, reached by a long jetty; Liu Hanyan |
+| 千佛寺 Temple of a Thousand Buddhas | on a hill up a long stair, a pagoda, four bells; Master Kuchan |
+| 暴龍崖 Tyrant Dragon Cliff | a red tower of rock with a path cut up its face; Leng Xiaotian on top |
+| 黑風寨 Black Wind Fort | a palisade on a hill, watchtowers, the chief's hall |
+| 天機瀑布 Stratagem Falls | behind the curtain of water, a jade gate |
+
+## Playing
+
+- **Two brothers.** Play Yi Rui or Yi Shuo and swap any time (Q); the other follows. Yi Rui runs a little faster,
+  Yi Shuo jumps a little higher.
+- **Fighting.** Yi Rui slashes and Yi Shuo kicks (J or left click). The specials cost qi (K or right click): Yi
+  Rui's 一刀啟程 sends a crescent of sword qi, Yi Shuo's 旋風球 a whirlwind ball that comes back to him. Qi refills
+  slowly.
+- **Foes.** The Black Wind bandits hold their fort and roam the wilds. Law Hall guards patrol the roads hunting the
+  fugitive brothers.
+- **Bosses.**
+  - 黑熊 Black Bear, the fort's chief, with his club.
+  - 冷笑天 Leng Xiaotian on the cliff top, who fights with palm wind.
+  - The Masked Man inside the Stratagem Pavilion.
+- **Lightness skills** are learnt from the masters, and each opens a new part of the land:
+  - **梯雲縱 Cloud Ladder** (a second jump): from Master Kuchan, after you ring the four bells round the temple hill.
+  - **水上飄 Skim the Water** (hold jump to glide; run fast and you run on water): from Liu Hanyan, after you drive off
+    the disguised assassins.
+  - **壁虎遊牆 Gecko on the Wall** (jump into a wall to climb it): the manual in Black Bear's chest.
+- **The four keys.**
+  - Azure Dragon: you start with it.
+  - Black Tortoise: from Master Kuchan.
+  - Vermilion Bird: from Liu Hanyan.
+  - White Tiger: beat Leng Xiaotian on the cliff top. The path up needs the Cloud Ladder, and the last sheer stretch
+    needs Gecko on the Wall.
+- **29 manual pages** are hidden on roofs, treetops, the tallest bamboo, cliff ledges and beside the falls. Every five
+  gives more health and every ten more qi. Once you have twenty, the rest show on the map.
+- **More.** A day passes in about ten minutes, with dawn, day, dusk and starry nights. Each place has its own ambient
+  sound and the music is a plucked zither. There is a map (M). The game saves itself, and there is Chinese and English.
+- **Controls:** WASD to move, Space to jump, J or left click to hit, K or right click for the special, E to talk or
+  use, Q to swap brothers, M for the map; the mouse turns the camera (click to lock it). Touch: a stick on the left,
+  drag on the right to look, and buttons.
+
+## How it is made
+
+| File | What it holds |
+|------|---------------|
+| `js/voxel.js` | the brick world: one byte a brick, drawn in 32×32 chunks of visible faces with a bevel, studs near you |
+| `js/worldgen.js` | the land: terrain, river, lake, cliff, falls, roads, every building, the pages, who stands where |
+| `js/game.js` | the game: moving through the bricks, the brothers, combat and foes, bosses, talking, the map, the hours |
+| `js/story.js` | everything said, the objectives, the ending |
+| `js/music.js` | the zither music, by land |
+| `js/cast/`, `js/moves/`, `js/fx.js`, `js/sound.js` | the characters, moves, effects and sounds, shared with Wulin Bricks |
