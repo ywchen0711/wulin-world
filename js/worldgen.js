@@ -1,4 +1,4 @@
-// 龍門江湖: the land of 龍門雙奕, 400 × 400 bricks, built brick by brick (one byte a brick). Mountains ring it; inside:
+// 龍門江湖: the land of 龍門雙奕, 800 × 800 bricks, built brick by brick (one byte a brick). Mountains ring it; inside:
 //   龍門刀莊 the Longmen Saber Manor (sealed by the Law Hall since the night of the murder) and its village to the south
 //   聽雨樓 the Listening-to-Rain teahouse in a market town at the crossroads, north-east of the manor
 //   竹林 the bamboo forest to the west, and in its heart a clearing with an old stone tablet
@@ -9,8 +9,9 @@
 //   天機閣 behind the great waterfall in the north, its gate shut by four locks
 // buildWorld() -> { V, spots: named points, npcs, foes, pages (hidden manual pages), bells, regions }
 import { Voxels, B } from './voxel.js';
+import { furnish } from './furnish.js';
 
-export const W = 400, D = 400, H = 100, G0 = 14, WL = 13;
+export const W = 800, D = 800, H = 100, G0 = 14, WL = 13;
 const h2 = (x, z, s) => { let h = (x * 374761393 + z * 668265263 + s * 2246822519) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const noise = (x, z, s) => { const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi, u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf), a = h2(xi, zi, s), b = h2(xi + 1, zi, s), c = h2(xi, zi + 1, s), d = h2(xi + 1, zi + 1, s); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
 const fbm = (x, z, s) => noise(x / 64, z / 64, s) * 0.55 + noise(x / 24, z / 24, s + 1) * 0.3 + noise(x / 9, z / 9, s + 2) * 0.15;
@@ -18,18 +19,26 @@ const rng = (s) => () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export const P = { // the places, as [x, z] in bricks
-  manor: [200, 246], village: [196, 296], town: [252, 172], bamboo: [92, 222], river: [304, 0], lake: [312, 300], temple: [104, 96], cliff: [352, 98], fort: [92, 326], falls: [200, 34], start: [214, 210],
+  manor: [400, 492], village: [392, 592], town: [504, 344], bamboo: [184, 444], lake: [624, 600], temple: [208, 192], cliff: [704, 196], fort: [184, 652], falls: [400, 34], start: [428, 420],
+  fishing: [560, 690], inn: [270, 520], bridge: [610, 250], ruins: [560, 470], tea: [300, 260], plum: [480, 700], cave: [80, 560], post: [[428, 432], [214, 470], [640, 330], [400, 120], [240, 640], [560, 650]],
 };
 export const REGIONS = [
-  { id: 'manor', at: P.manor, r: 30, name: { zh: '龍門刀莊', en: 'Longmen Saber Manor' }, amb: 'birds' },
-  { id: 'village', at: P.village, r: 30, name: { zh: '龍門村', en: 'Longmen Village' }, amb: 'birds' },
-  { id: 'town', at: P.town, r: 34, name: { zh: '聽雨樓・十字街', en: 'The Listening-to-Rain · Crossroads' }, amb: 'birds' },
-  { id: 'bamboo', at: P.bamboo, r: 60, name: { zh: '竹林', en: 'Bamboo Forest' }, amb: 'wind' },
-  { id: 'lake', at: P.lake, r: 34, name: { zh: '寒江閣', en: 'Cold River Pavilion' }, amb: 'wind' },
-  { id: 'temple', at: P.temple, r: 46, name: { zh: '千佛寺', en: 'Temple of a Thousand Buddhas' }, amb: 'wind' },
-  { id: 'cliff', at: P.cliff, r: 40, name: { zh: '暴龍崖', en: 'Tyrant Dragon Cliff' }, amb: 'wind' },
-  { id: 'fort', at: P.fort, r: 40, name: { zh: '黑風寨', en: 'Black Wind Fort' }, amb: 'wind' },
-  { id: 'falls', at: P.falls, r: 40, name: { zh: '天機瀑布', en: 'Stratagem Falls' }, amb: 'rain' },
+  { id: 'manor', at: P.manor, r: 48, name: { zh: '龍門刀莊', en: 'Longmen Saber Manor' }, amb: 'birds' },
+  { id: 'village', at: P.village, r: 48, name: { zh: '龍門村', en: 'Longmen Village' }, amb: 'birds' },
+  { id: 'town', at: P.town, r: 54, name: { zh: '聽雨樓・十字街', en: 'The Listening-to-Rain · Crossroads' }, amb: 'birds' },
+  { id: 'bamboo', at: P.bamboo, r: 96, name: { zh: '竹林', en: 'Bamboo Forest' }, amb: 'wind' },
+  { id: 'lake', at: P.lake, r: 54, name: { zh: '寒江閣', en: 'Cold River Pavilion' }, amb: 'wind' },
+  { id: 'temple', at: P.temple, r: 74, name: { zh: '千佛寺', en: 'Temple of a Thousand Buddhas' }, amb: 'wind' },
+  { id: 'cliff', at: P.cliff, r: 64, name: { zh: '暴龍崖', en: 'Tyrant Dragon Cliff' }, amb: 'wind' },
+  { id: 'fort', at: P.fort, r: 64, name: { zh: '黑風寨', en: 'Black Wind Fort' }, amb: 'wind' },
+  { id: 'fishing', at: P.fishing, r: 40, name: { zh: '漁村', en: 'Fishing Village' }, amb: 'wind' },
+  { id: 'inn', at: P.inn, r: 28, name: { zh: '悅來客棧', en: 'The Yuelai Inn' }, amb: 'birds' },
+  { id: 'bridge', at: P.bridge, r: 30, name: { zh: '斷橋', en: 'The Broken Bridge' }, amb: 'wind' },
+  { id: 'ruins', at: P.ruins, r: 40, name: { zh: '古戰場', en: 'The Old Battlefield' }, amb: 'wind' },
+  { id: 'tea', at: P.tea, r: 46, name: { zh: '雲霧茶園', en: 'Cloud Mist Tea Terraces' }, amb: 'birds' },
+  { id: 'plum', at: P.plum, r: 40, name: { zh: '梅林', en: 'Plum Grove' }, amb: 'birds' },
+  { id: 'cave', at: P.cave, r: 34, name: { zh: '黑風洞', en: 'Black Wind Cave' }, amb: 'wind' },
+  { id: 'falls', at: P.falls, r: 64, name: { zh: '天機瀑布', en: 'Stratagem Falls' }, amb: 'rain' },
 ];
 const riverX = (z) => P.lake[0] - 8 + Math.sin(z / 38) * 10 + Math.sin(z / 17) * 3;
 const dist = (x, z, p) => Math.hypot(x - p[0], z - p[1]);
@@ -41,7 +50,7 @@ export function buildWorld() {
     let h = G0 + (fbm(x, z, 3) - 0.5) * 5;
     const edge = Math.min(x, z, W - 1 - x, D - 1 - z); h += smooth(40, 0, edge) * (26 + fbm(x, z, 7) * 30); // the ring of mountains
     // the hills of the south-west, the fort on top
-    h += smooth(70, 20, dist(x, z, P.fort)) * 7 + smooth(60, 0, dist(x, z, [60, 360])) * 10;
+    h += smooth(110, 30, dist(x, z, P.fort)) * 7 + smooth(100, 0, dist(x, z, [120, 720])) * 12 + smooth(90, 20, dist(x, z, P.tea)) * 16 + smooth(60, 10, dist(x, z, P.cave)) * 18;
     // the temple hill: a cone with a flat top
     const dt = dist(x, z, P.temple); h = Math.max(h, G0 + 24 * smooth(44, 12, dt) + (fbm(x, z, 9) - 0.5) * 3 * smooth(12, 30, dt));
     // the Tyrant Dragon Cliff: a sheer tower of red rock
@@ -49,18 +58,19 @@ export function buildWorld() {
     // the great cliff wall of the north, and the falls
     if (z < 60) { const wall = smooth(62, 44, z) * 46; if (wall > 4) kind[z * W + x] = 3; h = Math.max(h, G0 + wall + (fbm(x, z, 13) - 0.5) * 4); }
     // flattened ground for the manor, the village, the town
-    for (const [p, r, lvl] of [[P.manor, 34, G0], [P.village, 30, G0], [P.town, 34, G0], [P.start, 10, G0]]) { const k = smooth(r, r - 10, dist(x, z, p)); h = h * (1 - k) + lvl * k; }
+    for (const [p, r, lvl] of [[P.manor, 34, G0], [P.village, 30, G0], [P.town, 34, G0], [P.start, 10, G0], [P.fishing, 30, G0], [P.inn, 16, G0], [P.ruins, 30, G0 + 1], [P.plum, 30, G0]]) { const k = smooth(r, r - 10, dist(x, z, p)); h = h * (1 - k) + lvl * k; }
     // the river and the lake (the river bed below the water line), sandy banks
     const dr = Math.abs(x - riverX(z)), dl = dist(x, z, P.lake) + (noise(x / 9, z / 9, 21) - 0.5) * 6;
     if (z > 50 && z < D - 30) { if (dr < 6) h = Math.min(h, WL - 3 + dr * 0.25); else if (dr < 10) { h = Math.min(h, WL + (dr - 6) * 0.4); kind[z * W + x] = 1; } }
-    if (dl < 30) h = Math.min(h, WL - 4 + Math.max(0, dl - 22) * 0.6); if (dl >= 26 && dl < 32 && h < WL + 2) kind[z * W + x] = 1;
+    if (dl < 46) h = Math.min(h, WL - 4 + Math.max(0, dl - 38) * 0.6); if (dl >= 42 && dl < 50 && h < WL + 2) kind[z * W + x] = 1;
     if (dist(x, z, P.lake) < 7) h = G0; // the island
     // the pool at the foot of the falls
     const df = dist(x, z, [P.falls[0], 66]); if (df < 14) h = Math.min(h, WL - 3 + Math.max(0, df - 10)); if (z >= 44 && z < 60 && Math.abs(x - P.falls[0]) < 4) h = Math.min(h, WL - 2);
     Hm[z * W + x] = Math.round(Math.max(3, Math.min(H - 6, h)));
   }
   // ---------------------------------------------------------------- the roads: the manor to the town, to the bamboo, to the temple, to the fort, to the lake, up to the falls
-  const roads = [[P.start, P.manor], [P.manor, P.village], [P.manor, [200, 210]], [[200, 210], P.town], [P.town, [P.town[0], 110]], [[P.town[0], 110], [P.cliff[0] - 26, P.cliff[1] + 10]], [[200, 210], [150, 214]], [[150, 214], P.bamboo], [P.bamboo, [100, 150]], [[100, 150], [P.temple[0], P.temple[1] + 46]], [P.bamboo, [96, 280]], [[96, 280], P.fort], [P.town, [P.lake[0] - 36, P.town[1] + 40]], [[P.lake[0] - 36, P.town[1] + 40], [P.lake[0] - 30, P.lake[1] - 6]], [[P.town[0], 110], [P.falls[0], 76]], [P.village, [150, 330]], [[150, 330], P.fort]];
+  const roads = [[P.start, P.manor], [P.manor, P.village], [P.manor, [400, 420]], [[400, 420], P.town], [P.town, [P.town[0], 220]], [[P.town[0], 220], [P.cliff[0] - 30, P.cliff[1] + 12]], [[400, 420], [300, 428]], [[300, 428], P.bamboo], [P.bamboo, [200, 300]], [[200, 300], [P.temple[0], P.temple[1] + 46]], [P.bamboo, [192, 560]], [[192, 560], P.fort], [P.town, [P.lake[0] - 56, P.town[1] + 80]], [[P.lake[0] - 56, P.town[1] + 80], [P.lake[0] - 50, P.lake[1] - 6]], [[P.town[0], 220], [P.falls[0], 76]], [P.village, [300, 660]], [[300, 660], P.fort],
+    [[300, 428], P.inn], [P.town, P.tea], [[P.town[0], 220], [P.bridge[0] - 18, P.bridge[1]]], [[P.bridge[0] + 18, P.bridge[1]], [P.cliff[0] - 30, P.cliff[1] + 12]], [P.manor, P.ruins], [P.ruins, [P.lake[0] - 50, P.lake[1] - 6]], [P.village, P.plum], [P.plum, P.fishing], [P.fishing, [P.lake[0] - 20, P.lake[1] + 46]], [[192, 560], P.cave]];
   const isRoad = new Uint8Array(W * D);
   for (const [a, b] of roads) { const L = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let i = 0; i <= L; i++) { const t = i / L, cx = a[0] + (b[0] - a[0]) * t + Math.sin(t * 9 + a[0]) * 2 * Math.sin(Math.PI * t), cz = a[1] + (b[1] - a[1]) * t; for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const x = Math.round(cx + dx), z = Math.round(cz + dz); if (x < 0 || z < 0 || x >= W || z >= D) continue; if (Hm[z * W + x] >= WL && kind[z * W + x] !== 3) isRoad[z * W + x] = 1; } } }
   // ---------------------------------------------------------------- lay the ground
@@ -120,21 +130,21 @@ export function buildWorld() {
     page(cx, y + 18, cz - 13, 'teahouse roof'); }
   // ---------------------------------------------------------------- 竹林 the bamboo forest and its clearing with the tablet
   { const [cx, cz] = P.bamboo;
-    for (let k = 0; k < 1700; k++) { const x = Math.floor(cx - 60 + R() * 120), z = Math.floor(cz - 60 + R() * 120); if (dist(x, z, P.bamboo) > 60 || dist(x, z, P.bamboo) < 8 || isRoad[z * W + x]) continue; bamboo(x, z); }
+    for (let k = 0; k < 5200; k++) { const x = Math.floor(cx - 100 + R() * 200), z = Math.floor(cz - 100 + R() * 200); if (dist(x, z, P.bamboo) > 100 || dist(x, z, P.bamboo) < 8 || isRoad[z * W + x]) continue; bamboo(x, z); }
     const y = top(cx, cz); box(cx - 1, y, cz, cx + 1, y + 4, cz, B.GREY); V.set(cx, y + 5, cz, B.ROOF);
     signs.push({ x: cx, z: cz + 1, text: { zh: '竹影搖風，一步一影。高處自有天機。', en: 'Bamboo shadows sway; a shadow at every step. Heaven’s secret waits up high.' } });
-    let best = null; for (let k = 0; k < 40; k++) { const x = Math.floor(cx - 30 + R() * 60), z = Math.floor(cz - 30 + R() * 60), y2 = V.topAny(x, z); if (V.get(x, y2 - 1, z) === B.BAMBOO || V.get(x, y2 - 1, z) === B.BAMLEAF) if (!best || y2 > best[1]) best = [x, y2, z]; }
+    let best = null; for (let k = 0; k < 80; k++) { const x = Math.floor(cx - 50 + R() * 100), z = Math.floor(cz - 50 + R() * 100), y2 = V.topAny(x, z); if (V.get(x, y2 - 1, z) === B.BAMBOO || V.get(x, y2 - 1, z) === B.BAMLEAF) if (!best || y2 > best[1]) best = [x, y2, z]; }
     if (best) page(best[0], best[1], best[2], 'tallest bamboo');
-    for (let k = 0; k < 3; k++) { const x = Math.floor(cx - 40 + R() * 80), z = Math.floor(cz - 40 + R() * 80); page(x, top(x, z), z, 'bamboo floor'); } }
+    for (let k = 0; k < 4; k++) { const x = Math.floor(cx - 70 + R() * 140), z = Math.floor(cz - 70 + R() * 140); page(x, top(x, z), z, 'bamboo floor'); } }
   // ---------------------------------------------------------------- trees and pines over the open land
-  for (let k = 0; k < 2600; k++) { const x = Math.floor(R() * W), z = Math.floor(R() * D), y = Hm[z * W + x]; if (isRoad[z * W + x] || y <= WL + 1 || kind[z * W + x]) continue; if (dist(x, z, P.manor) < 36 || dist(x, z, P.town) < 38 || dist(x, z, P.village) < 30 || dist(x, z, P.bamboo) < 62 || dist(x, z, P.temple) < 18 || dist(x, z, P.fort) < 26) continue; const f = fbm(x * 2, z * 2, 31); if (f < 0.5) continue; (y > G0 + 8 ? pine : R() < 0.15 ? (x2, z2) => { const t = tree(x2, z2, { leaf: B.BLOSSOM }); return t; } : tree)(x, z); }
-  for (let k = 0; k < 120; k++) { const x = Math.floor(R() * W), z = Math.floor(R() * D); if (Hm[z * W + x] === WL + 1 || (kind[z * W + x] === 1 && Hm[z * W + x] <= WL + 1)) for (let i = 0; i < 6; i++) { const a = x + Math.floor(R() * 5) - 2, b = z + Math.floor(R() * 5) - 2; if (V.get(a, WL + 1, b) === B.AIR && V.get(a, WL, b) === B.WATER) V.set(a, WL + 1, b, B.REED); } }
+  for (let k = 0; k < 11000; k++) { const x = Math.floor(R() * W), z = Math.floor(R() * D), y = Hm[z * W + x]; if (isRoad[z * W + x] || y <= WL + 1 || kind[z * W + x]) continue; if (dist(x, z, P.manor) < 36 || dist(x, z, P.town) < 38 || dist(x, z, P.village) < 30 || dist(x, z, P.bamboo) < 102 || dist(x, z, P.fishing) < 30 || dist(x, z, P.ruins) < 30 || dist(x, z, P.inn) < 16 || dist(x, z, P.tea) < 50 || dist(x, z, P.plum) < 30 || dist(x, z, P.temple) < 18 || dist(x, z, P.fort) < 26) continue; const f = fbm(x * 2, z * 2, 31); if (f < 0.5) continue; (y > G0 + 8 ? pine : R() < 0.15 ? (x2, z2) => { const t = tree(x2, z2, { leaf: B.BLOSSOM }); return t; } : tree)(x, z); }
+  for (let k = 0; k < 600; k++) { const x = Math.floor(R() * W), z = Math.floor(R() * D); if (Hm[z * W + x] === WL + 1 || (kind[z * W + x] === 1 && Hm[z * W + x] <= WL + 1)) for (let i = 0; i < 6; i++) { const a = x + Math.floor(R() * 5) - 2, b = z + Math.floor(R() * 5) - 2; if (V.get(a, WL + 1, b) === B.AIR && V.get(a, WL, b) === B.WATER) V.set(a, WL + 1, b, B.REED); } }
   // ---------------------------------------------------------------- 寒江閣 the pavilion on the island, a jetty, boats
   { const [cx, cz] = P.lake, y = G0;
     house(cx - 4, cz - 4, 9, 9, y, { pillars: true, open: true, h: 5, roof: B.DARK });
     for (const [x, z] of [[cx - 4, cz - 4], [cx + 4, cz - 4], [cx - 4, cz + 4], [cx + 4, cz + 4]]) box(x, y + 1, z, x, y + 5, z, B.RED);
-    for (let x = cx - 30; x < cx - 6; x++) box(x, WL + 1, cz - 1, x, WL + 1, cz + 1, B.PLANK); // the long jetty out to it
-    for (let x = cx - 30; x < cx - 6; x += 4) for (const z of [cz - 2, cz + 2]) box(x, WL - 2, z, x, WL + 1, z, B.WOOD);
+    for (let x = cx - 46; x < cx - 6; x++) box(x, WL + 1, cz - 1, x, WL + 1, cz + 1, B.PLANK); // the long jetty out to it
+    for (let x = cx - 46; x < cx - 6; x += 4) for (const z of [cz - 2, cz + 2]) box(x, WL - 2, z, x, WL + 1, z, B.WOOD);
     spots.pavilion = [cx, cz]; page(cx, y + 11, cz, 'pavilion roof'); }
   // ---------------------------------------------------------------- 千佛寺 the temple on the hill, its stair, four bells round the hill
   { const [cx, cz] = P.temple, y = top(cx, cz);
@@ -180,7 +190,7 @@ export function buildWorld() {
     for (let y = G0 + 20; y < G0 + 30; y++) box(fx - 9, y, wallZ + 2, fx - 7, y, wallZ + 2, B.AIR); page(fx - 8, G0 + 20, wallZ + 2, 'high in the cliff'); box(fx - 9, G0 + 19, wallZ + 2, fx - 7, G0 + 19, wallZ + 3, B.CLIFF);
   }
   // ---------------------------------------------------------------- more manual pages, in the open: on hilltops, treetops, under bridges, in the reeds
-  const extra = [[260, 300], [150, 160], [340, 200], [60, 140], [240, 360], [180, 120], [130, 280], [350, 360], [40, 250], [270, 240], [210, 160], [330, 130], [150, 370], [100, 190], [360, 270]];
+  const extra = [[520, 600], [300, 320], [680, 400], [120, 280], [480, 720], [360, 240], [260, 560], [700, 720], [80, 500], [540, 480], [420, 320], [660, 260], [300, 740], [200, 380], [720, 540], [140, 120], [600, 140], [460, 180], [740, 640], [100, 740]];
   for (const [x, z] of extra) { const y = V.topAny(x, z); page(x, y, z, 'land'); }
   // ---------------------------------------------------------------- who is where
   const at = (x, z) => ({ x: x + 0.5, y: top(x, z), z: z + 0.5 });
@@ -195,10 +205,11 @@ export function buildWorld() {
   // the Black Wind about the land and in their fort; the Law Hall on the roads; Black Bear in his hall
   const band = (x, z, cast = R() < 0.5 ? 'shouhou' : 'daoba') => foes.push({ cast, ...at(x, z), home: [x + 0.5, z + 0.5], hp: cast === 'daoba' ? 4 : 3, team: 'heifeng' });
   for (const [x, z] of [[P.fort[0] + 8, P.fort[1] + 4], [P.fort[0] - 9, P.fort[1] + 6], [P.fort[0] + 2, P.fort[1] + 12], [P.fort[0] - 4, P.fort[1] - 12], [P.fort[0] + 12, P.fort[1] - 6], [P.fort[0] - 13, P.fort[1] - 3]]) band(x, z);
-  for (const [x, z] of [[120, 300], [130, 250], [70, 200], [110, 180], [160, 330], [60, 300]]) band(x, z);
-  for (const [x, z] of [[230, 200], [262, 130], [280, 210], [200, 140], [250, 250]]) foes.push({ cast: R() < 0.5 ? 'guard1' : 'guard2', ...at(x, z), home: [x + 0.5, z + 0.5], hp: 4, team: 'meng' });
+  for (const [x, z] of [[240, 600], [260, 500], [140, 400], [220, 360], [320, 660], [120, 600], [90, 545], [70, 575], [100, 590], [600, 520], [580, 440], [330, 300], [680, 470]]) band(x, z);
+  for (const [x, z] of [[460, 400], [524, 260], [560, 420], [400, 280], [500, 500], [430, 460], [590, 330], [270, 440]]) foes.push({ cast: R() < 0.5 ? 'guard1' : 'guard2', ...at(x, z), home: [x + 0.5, z + 0.5], hp: 4, team: 'meng' });
   foes.push({ cast: 'heixiong', ...at(P.fort[0], P.fort[1] + 1), home: [P.fort[0] + 0.5, P.fort[1] + 1.5], hp: 14, boss: 'chief', team: 'heifeng' });
   spots.xiaotian = at(P.cliff[0], P.cliff[1]);
-  return { V, spots, npcs, foes, pages, bells, chests, signs, Hm, isRoad };
+  const things = furnish({ V, R, Hm, kind, isRoad, P, W, D, G0, WL, top, box, hollow, roofOver, house, lantern, tree, pine, page, npcs, foes, at, signs, chests, spots, dist });
+  return { V, spots, npcs, foes, pages, bells, chests, signs, Hm, isRoad, things };
 }
 export const regionAt = (x, z) => { let best = null, bd = 1e9; for (const r of REGIONS) { const d = dist(x, z, r.at) / r.r; if (d < 1 && d < bd) { bd = d; best = r; } } return best; };

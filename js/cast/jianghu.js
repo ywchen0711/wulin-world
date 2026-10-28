@@ -49,3 +49,11 @@ export const MASKED = {
     scene?.add(F.root); return { F, glows, cape, tip: F.hands[0], base: F.hands[1], remove() { F.root.parent?.remove(F.root); }, setGlow(k) { glows.forEach((g) => (g.material.opacity = Math.min(0.9, k * 0.8))); }, sway(t) { cape.rotation.x = -0.08 + Math.sin(t * 2.3) * 0.05; } };
   },
 };
+// the innkeeper of the Yuelai, with a towel over his shoulder; and two village children who play football
+const plainBuild = (spec, extra) => (scene) => { const F = makeFig(spec); extra?.(F); scene?.add(F.root); return { F, grips: [], remove() { F.root.parent?.remove(F.root); }, sway() {}, setGlow() {} }; };
+export const INNKEEPER = { id: 'innkeeper', name: { zh: '掌櫃', en: 'The innkeeper' }, title: { zh: '悅來客棧', en: 'The Yuelai Inn' }, spec: { age: 'adult', mustache: '#2a1a14', cheeks: true, colors: { top: '#8a5a3a', bottom: '#3a2a1e', shoes: '#1a1210' }, outfit: { top: 'coat', bottom: 'pants', apron: '#f2e6d0' }, hair: { style: 'short', color: '#2a1a14' }, hat: { type: 'cap', color: '#3a2a1e' } }, moves: [], idle: still({ mouth: { smile: 0.7 } }) };
+INNKEEPER.build = plainBuild(INNKEEPER.spec, (F) => { const t = mk(rbox(3, 10, 1.4, 0.4), plastic('#f4f0e6'), F.body); t.position.set(5, 22, 0); });
+export const KID1 = { id: 'kid1', name: { zh: '小虎', en: 'Little Hu' }, title: { zh: '村裡的孩子', en: 'A village child' }, spec: { age: 'kid', cheeks: true, colors: { top: '#3a8ad8', bottom: '#2a3a5a', shoes: '#f2eee4' }, outfit: { top: 'tee', bottom: 'pants' }, hair: { style: 'spiky', color: '#1a1210' } }, moves: [], idle: (c) => ({ pose: { armR: Math.sin(c * 5) * 0.4, armL: -Math.sin(c * 5) * 0.4, hipR: Math.sin(c * 5) * 0.2, hipL: -Math.sin(c * 5) * 0.2, y: Math.abs(Math.sin(c * 5)) * 0.03 }, face: { happy: 0.8, mouth: { smile: 0.9 } } }) };
+KID1.build = plainBuild(KID1.spec);
+export const KID2 = { id: 'kid2', name: { zh: '阿蓮', en: 'Ah Lian' }, title: { zh: '村裡的孩子', en: 'A village child' }, spec: { age: 'kid', cheeks: true, lashes: true, colors: { top: '#e85a8a', bottom: '#5a2a4a', shoes: '#f2eee4' }, outfit: { top: 'tee', bottom: 'skirt' }, hair: { style: 'ponytail', color: '#2a1a12', clip: '#f0c858' } }, moves: [], idle: KID1.idle };
+KID2.build = plainBuild(KID2.spec);

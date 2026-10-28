@@ -72,9 +72,22 @@ export function talk(id, S, G) {
         L('xiaotian', '白虎鑰？拿得走，就是你們的。', 'The White Tiger Key? Take it from me, and it is yours.'),
       ], then: (G) => { f.xiaoMet = true; G.duel('xiaotian'); } };
       return { lines: [L('xiaotian', '……好。龍門的刀，果然不是左手刀。白虎鑰，拿去。', '…Good. The Longmen blade is no left-handed blade after all. Take the White Tiger Key.')], then: (G) => { if (!k.bai) { k.bai = true; G.gain('bai'); } } };
+    case 'innkeeper': return { lines: [L('innkeeper', '客官裡邊請！包子熱騰騰，好酒一壺，喝了內力滿滿。', 'Come in, come in! Buns piping hot, and a jug of wine to fill you with qi.')], then: (G) => G.shop([{ id: 'bun', price: 8 }, { id: 'wine', price: 12 }]) };
+    case 'xiaofan':
+      if (f.hawsQuest === 'given') return { lines: [L('xiaofan', '我的糖葫蘆擔子回來了！少俠，往後吃糖葫蘆一律半價！', 'My candied haws are back! From now on, half price for you two!')], then: (G) => G.shop([{ id: 'haws', price: 3 }]) };
+      if (G.has('haws')) return { lines: [L('xiaofan', '這……這是我的糖葫蘆擔子！謝謝少俠！這些銅錢，一點心意！', 'That… that’s my crate of candied haws! Thank you! Take these coins, a small thanks!')], then: (G) => { f.hawsQuest = 'given'; G.take('haws'); G.coins(40); } };
+      if (!f.hawsQuest) return { lines: [L('xiaofan', '唉……黑風寨的山賊搶了我一整擔糖葫蘆，聽說藏在西邊山裡的黑風洞。', 'Alas… the Black Wind bandits stole a whole crate of my candied haws. They say it’s hidden in the Black Wind Cave in the western hills.'), L('xiaofan', '要是少俠幫我找回來，一定重重有賞！先買一串吧？', 'If you could bring it back, I’d reward you well! Buy one meanwhile?')], then: (G) => { f.hawsQuest = 'asked'; G.shop([{ id: 'haws', price: 6 }]); } };
+      return { lines: [L('xiaofan', '糖葫蘆！又酸又甜！', 'Candied haws! Sweet and sour!')], then: (G) => G.shop([{ id: 'haws', price: 6 }]) };
+    case 'dashen':
+      if (f.pinQuest === 'given') return { lines: [L('dashen', '這支簪子是我娘留給我的……少俠真是好人。', 'This hairpin was my mother’s… you are good lads.')] };
+      if (G.has('hairpin')) return { lines: [L('dashen', '我的玉簪！在梅林找到的？太好了……這幾十文，你們拿去買包子吃。', 'My jade hairpin! You found it in the plum grove? Wonderful… take these coins, buy yourselves some buns.')], then: (G) => { f.pinQuest = 'given'; G.take('hairpin'); G.coins(50); } };
+      if (!f.pinQuest) return { lines: [L('dashen', '少俠，前幾天我去南邊梅林賞花，把一支玉簪掉在那裡了，一直找不到……', 'Lads, a few days ago I went to see the blossom in the plum grove to the south and lost a jade hairpin there. I can’t find it…')], then: () => { f.pinQuest = 'asked'; } };
+      return { lines: [L('dashen', '玉簪掉在梅林西南邊，花樹底下吧……', 'Somewhere in the south-west of the plum grove, under the trees…')] };
+    case 'kid1': case 'kid2':
+      if (f.football === 'won') return { lines: [L(id, '奕碩哥哥最厲害！再來踢嘛！', 'Brother Shuo is the best! Play again!')] };
+      return { lines: [L(id, f.football ? '再來！球門就在那邊，從白線那裡踢進去！' : '大哥哥，跟我們踢球！從場上的白線那裡，踢進球門三次，就算你贏！', f.football ? 'Again! The goal’s over there; kick it in from the white line!' : 'Play football with us! Kick it into the goal three times from the line, and you win!')], then: (G) => { f.football = f.football || 'on'; G.startFootball(); } };
+    case 'fisher': return { lines: [L('fisher', ['湖心那座閣子，住著一位用劍的女俠。', '斷橋那邊啊，要會輕功才過得去。', '撒網撈魚，一網一網都是日子。'][Math.floor(G.clock / 6) % 3], ['In the pavilion on the lake lives a lady of the sword.', 'The broken bridge? Only lightness skill gets you across.', 'Cast the net, haul the fish: one net, then another, that’s life.'][Math.floor(G.clock / 6) % 3])] };
     case 'abo': return { lines: [L('abo', ['唉，龍門刀莊被封了，貼滿了執法堂的封條。', '小兄弟，躲著點執法堂的人。', '村北的路通到十字街，往西是竹林。'][Math.floor(G.clock / 6) % 3], ['Alas, the Longmen Manor is sealed, covered in Law Hall strips.', 'Lads, keep away from the Law Hall men.', 'The road north goes to the crossroads; west is the bamboo forest.'][Math.floor(G.clock / 6) % 3])] };
-    case 'dashen': return { lines: [L('dashen', ['聽雨樓的白先生啊，天下事沒有他不知道的。', '寒江上的閣主，劍法冷得跟冰一樣。'][Math.floor(G.clock / 6) % 2], ['Master Bai at the teahouse: there’s nothing he doesn’t know.', 'The mistress on the Cold River: her swordplay is cold as ice.'][Math.floor(G.clock / 6) % 2])] };
-    case 'xiaofan': return { lines: [L('xiaofan', ['糖葫蘆！不要錢，給兩位少俠的！', '聽說北邊瀑布後面，有一扇玉做的門。'][Math.floor(G.clock / 6) % 2], ['Candied haws! Free, for you two!', 'They say behind the falls in the north there’s a door made of jade.'][Math.floor(G.clock / 6) % 2])] };
     case 'chest': return { lines: [L('rui', '黑熊藏的秘笈……「壁虎遊牆」！', 'The manual Black Bear hid… “Gecko on the Wall”!')], then: (G) => { sk.climb = true; G.learn('climb'); } };
     case 'gate':
       if (Object.values(k).filter(Boolean).length < 4) return { lines: [L('rui', `玉門上有四個鎖孔……還缺${4 - Object.values(k).filter(Boolean).length}片鑰匙。`, `Four keyholes in the jade door… we are ${4 - Object.values(k).filter(Boolean).length} key(s) short.`)] };
@@ -90,6 +103,10 @@ export function talk(id, S, G) {
     default: return { lines: [] };
   }
 }
+export const GOODS = {
+  bun: { zh: '肉包子', en: 'Meat bun', what: { zh: '回復 4 點氣血', en: 'restores 4 health' } }, wine: { zh: '女兒紅', en: 'Daughter’s Red wine', what: { zh: '內力全滿', en: 'fills your qi' } }, haws: { zh: '糖葫蘆', en: 'Candied haws', what: { zh: '回復 2 點氣血', en: 'restores 2 health' } },
+};
+export const ITEMS = { hairpin: { zh: '玉簪', en: 'Jade hairpin' }, haws: { zh: '糖葫蘆擔子', en: 'Crate of candied haws' } };
 export const ENDING = {
   zh: ['蒙面人化作一陣煙，留下半卷《天機策》。', '卷末寫著一行字：「雙奕出，天機變。」', '真相，總比猜測多一層——', '《龍門雙奕》第一季・待續'],
   en: ['The masked man vanishes in a puff of smoke, leaving half a scroll of the Stratagem behind.', 'At its end, one line: “When the two Yi come forth, heaven’s plan will change.”', 'The truth is always one layer deeper than the guess.', 'The Longmen Brothers · to be continued'],

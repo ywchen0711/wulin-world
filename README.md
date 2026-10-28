@@ -12,7 +12,7 @@ swordsman) and Yi Shuo (his little brother, who fights with a football) are on t
 one of the four **Stratagem Keys**. Behind the great falls in the north, the four keys open the **Stratagem
 Pavilion**, where the truth is kept.
 
-## The land (400 × 400 bricks)
+## The land (800 × 800 bricks)
 
 | Place | What is there |
 |-------|---------------|
@@ -25,6 +25,13 @@ Pavilion**, where the truth is kept.
 | 暴龍崖 Tyrant Dragon Cliff | a red tower of rock with a path cut up its face; Leng Xiaotian on top |
 | 黑風寨 Black Wind Fort | a palisade on a hill, watchtowers, the chief's hall |
 | 天機瀑布 Stratagem Falls | behind the curtain of water, a jade gate |
+| 漁村 Fishing Village | stilt houses with reed roofs, fish-drying racks, a jetty, boats, ducks |
+| 悅來客棧 The Yuelai Inn | a two-storey inn on the western road, a stable and its horse; the innkeeper sells buns and wine |
+| 斷橋 The Broken Bridge | an arched bridge over the Cold River with a span fallen out of its middle |
+| 古戰場 The Old Battlefield | broken walls, toppled pillars, blades in the ground, tattered banners, bandits, chests |
+| 雲霧茶園 Tea Terraces | rows of tea climbing the hill north of the town, a pavilion at the top |
+| 梅林 Plum Grove | blossoming trees round a pond, a pavilion, cranes |
+| 黑風洞 Black Wind Cave | a tunnel into the western hills, a lit hall full of the bandits' loot |
 
 ## Playing
 
@@ -52,6 +59,16 @@ Pavilion**, where the truth is kept.
     needs Gecko on the Wall.
 - **29 manual pages** are hidden on roofs, treetops, the tallest bamboo, cliff ledges and beside the falls. Every five
   gives more health and every ten more qi. Once you have twenty, the rest show on the map.
+- **Things to do.**
+  - Smash urns and crates for coins, buns (health) and gourds (qi).
+  - Open 28 treasure chests (coins, sometimes a manual page).
+  - Shop: buns and wine at the inn, candied haws from the pedlar.
+  - Ride between the six post stations (驛站) you have visited.
+  - Meditate at the eight meditation stones (打坐處) to heal; you wake at the last one if you fall.
+  - Hit the training dummies in the manor yard.
+  - Beat the village kids at football (three goals in a minute).
+  - Find 大嬸's jade hairpin in the plum grove and the pedlar's stolen crate in the Black Wind Cave.
+  - Chickens, ducks, deer and cranes live about the land and run from you.
 - **More.** A day passes in about ten minutes, with dawn, day, dusk and starry nights. Each place has its own ambient
   sound and the music is a plucked zither. There is a map (M). The game saves itself, and there is Chinese and English.
 - **Controls:** WASD to move, Space to jump, J or left click to hit, K or right click for the special, E to talk or
