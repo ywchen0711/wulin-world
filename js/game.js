@@ -61,9 +61,11 @@ function lightHour(tod, at) {
   let i = 0; while (i < HOURS.length - 2 && tod >= HOURS[i + 1][0]) i++; const [t0, a] = HOURS[i], [t1, b] = HOURS[i + 1], u = clamp((tod - t0) / (t1 - t0), 0, 1);
   const mix = (k) => ca.set(a[k]).lerp(cb.set(b[k]), u).clone(), num = (k) => a[k] + (b[k] - a[k]) * u, U = sky.material.uniforms;
   U.top.value.copy(mix('top')); U.hor.value.copy(mix('hor')); U.glow.value.copy(mix('glow')); U.stars.value = num('stars');
-  const ang = (tod - 0.25) * Math.PI * 2, dir = tod > 0.22 && tod < 0.8 ? V3(Math.cos(ang) * 0.8, Math.max(0.12, Math.sin(ang)), 0.45).normalize() : V3(-0.3, 0.6, 0.5).normalize(); U.sun.value.copy(dir);
+  const todQ = Math.round(tod * 240) / 240, ang = (todQ - 0.25) * Math.PI * 2, dir = tod > 0.22 && tod < 0.8 ? V3(Math.cos(ang) * 0.8, Math.max(0.12, Math.sin(ang)), 0.45).normalize() : V3(-0.3, 0.6, 0.5).normalize(); U.sun.value.copy(dir);
   sun.color.copy(mix('sun')); sun.intensity = num('sunI'); hemi.color.copy(mix('sky')); hemi.groundColor.copy(mix('gr')); hemi.intensity = num('hemi'); scene.fog.color.copy(mix('fog')); R.toneMappingExposure = num('exp');
-  sun.position.copy(at).addScaledVector(dir, 60); sun.target.position.copy(at);
+  const texel = 60 / 2048, basisX = V3().crossVectors(dir, V3(0, 1, 0)).normalize(), basisY = V3().crossVectors(basisX, dir).normalize();
+  const cx = Math.round(at.dot(basisX) / texel) * texel, cy = Math.round(at.dot(basisY) / texel) * texel, cz = at.dot(dir), snap = basisX.multiplyScalar(cx).addScaledVector(basisY, cy).addScaledVector(dir, cz);
+  sun.position.copy(snap).addScaledVector(dir, 60); sun.target.position.copy(snap);
   return { night: num('stars') > 0.5 };
 }
 
@@ -110,7 +112,7 @@ if (!S.keys.bai) { xiao = makeFigure('xiaotian', { ...Wd.spots.xiaotian, npc: 'x
 // ---------------------------------------------------------------- moving through the bricks
 const solidAt = (x, y, z) => SOLID(V.get(Math.floor(x), Math.floor(y), Math.floor(z)));
 function collides(f, x, y, z) {
-  const r = f.r; for (const yy of [y + 0.05, y + f.h * 0.5, y + f.h - 0.05]) for (const [dx, dz] of [[-r, -r], [r, -r], [-r, r], [r, r]]) if (solidAt(x + dx, yy, z + dz)) return true; return false;
+  const r = f.r; for (const yy of [y + 0.002, y + f.h * 0.5, y + f.h - 0.05]) for (const [dx, dz] of [[-r, -r], [r, -r], [-r, r], [r, r]]) if (solidAt(x + dx, yy, z + dz)) return true; return false;
 }
 const waterAt = (x, y, z) => V.get(Math.floor(x), Math.floor(y), Math.floor(z)) === B.WATER;
 function moveFig(f, dt) {
@@ -156,11 +158,27 @@ addEventListener('wheel', (e) => { wheel += e.deltaY; }, { passive: true });
   for (const [id, k] of [['tJump', 'Space'], ['tAtk', 'KeyJ'], ['tSp', 'KeyK'], ['tUse', 'KeyE'], ['tSwap', 'KeyQ'], ['tMap', 'KeyM']]) { const b = $(id); b.addEventListener('touchstart', (e) => { e.preventDefault(); keys[k] = true; keys['_' + k] = true; }); b.addEventListener('touchend', (e) => { e.preventDefault(); keys[k] = false; }); }
 }
 
+// a game controller (the standard layout): A jump, X hit, Y special, B talk/use, LB/RB swap brothers, Back/Start map;
+// the left stick (or the d-pad) moves, the right stick turns the camera, the triggers zoom
+const pad = { prev: [], mx: 0, mz: 0, on: false };
+const PADKEYS = { 0: 'Space', 2: 'KeyJ', 3: 'KeyK', 1: 'KeyE', 4: 'KeyQ', 5: 'KeyQ', 8: 'KeyM', 9: 'KeyM' };
+function pollPad(dt) {
+  const gp = [...(navigator.getGamepads?.() || [])].find((g) => g && g.connected); if (!gp) { pad.mx = pad.mz = 0; return; }
+  if (!pad.on) { pad.on = true; toast(T('已連接手把', 'Controller connected')); wake(); music.start(); }
+  const dz = (v) => (Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v) * 0.18) / 0.82), b = (i) => !!gp.buttons[i]?.pressed;
+  pad.mx = dz(gp.axes[0] || 0) + (b(15) ? 1 : 0) - (b(14) ? 1 : 0); pad.mz = dz(gp.axes[1] || 0) + (b(13) ? 1 : 0) - (b(12) ? 1 : 0);
+  mouseDX += dz(gp.axes[2] || 0) * 900 * dt; mouseDY += dz(gp.axes[3] || 0) * 600 * dt;
+  wheel += ((gp.buttons[6]?.value || 0) - (gp.buttons[7]?.value || 0)) * 900 * dt;
+  for (const [i, code] of Object.entries(PADKEYS)) { const now = b(+i); if (now && !pad.prev[i]) { keys[code] = true; keys['_' + code] = true; } if (!now && pad.prev[i]) keys[code] = false; pad.prev[i] = now; }
+  if (b(0)) keys.Space = true; // held, for gliding and swimming up
+}
+addEventListener('gamepadconnected', () => { wake(); music.start(); });
 // ---------------------------------------------------------------- the camera
 const cam = { yaw: Math.PI, pitch: 0.42, dist: 10, pos: V3(), look: V3() };
 function placeCamera(dt) {
   cam.yaw -= mouseDX * 0.0032; cam.pitch = clamp(cam.pitch + mouseDY * 0.0026, -0.25, 1.2); mouseDX = mouseDY = 0; cam.dist = clamp(cam.dist * Math.exp(wheel * 0.001), 3, window.CAMD || 16); wheel = 0;
-  const head = V3(me.x, me.y + me.h * 0.85, me.z), want = V3(Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), Math.cos(cam.yaw) * Math.cos(cam.pitch));
+  cam.footY = cam.footY == null ? me.y : cam.footY + (me.y - cam.footY) * Math.min(1, dt * (Math.abs(me.y - cam.footY) > 4 ? 30 : 9));
+  const head = V3(me.x, cam.footY + me.h * 0.85, me.z), want = V3(Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), Math.cos(cam.yaw) * Math.cos(cam.pitch));
   let d = cam.dist; for (let s = 0.4; s < cam.dist; s += 0.25) { const p = head.clone().addScaledVector(want, s); if (solidAt(p.x, p.y, p.z)) { d = Math.max(1.2, s - 0.5); break; } } // pulled in before walls
   const pos = head.clone().addScaledVector(want, d); cam.pos.lerp(pos, Math.min(1, dt * 12)); cam.look.lerp(head, Math.min(1, dt * 14));
   camera.position.copy(cam.pos).multiplyScalar(VS); camera.lookAt(cam.look.clone().multiplyScalar(VS)); sky.position.copy(camera.position);
@@ -326,7 +344,7 @@ function hud() {
   $('who').textContent = me.CH.name[lang]; $('skills').innerHTML = Object.entries(SKILLS).map(([k, s]) => `<span class="${S.skills[k] ? 'on' : ''}">${s[lang]}</span>`).join('');
   const o = objective(S); $('goal').textContent = o[lang];
   $('tUse').textContent = T('對話', 'Talk'); $('tSwap').textContent = T('換人', 'Swap'); $('tAtk').textContent = T('攻擊', 'Hit'); $('tSp').textContent = me.CH.id === 'yirui' ? T('一刀', 'Cut') : T('旋風', 'Whirl'); $('tMap').textContent = T('地圖', 'Map');
-  $('help').textContent = T('WASD 移動・空白鍵 跳・J/左鍵 攻擊・K/右鍵 絕招・E 對話・Q 換人・M 地圖・滑鼠轉視角', 'WASD move · Space jump · J/left click hit · K/right click special · E talk · Q swap · M map · mouse looks');
+  $('help').textContent = pad.on ? T('手把：左搖桿 移動・右搖桿 視角・A 跳・X 攻擊・Y 絕招・B 對話・LB/RB 換人・Start 地圖', 'Controller: left stick move · right stick look · A jump · X hit · Y special · B talk · LB/RB swap · Start map') : T('WASD 移動・空白鍵 跳・J/左鍵 攻擊・K/右鍵 絕招・E 對話・Q 換人・M 地圖・滑鼠轉視角', 'WASD move · Space jump · J/left click hit · K/right click special · E talk · Q swap · M map · mouse looks');
   $('lang').textContent = lang === 'zh' ? 'EN' : '中';
 }
 $('lang').onclick = () => { lang = lang === 'zh' ? 'en' : 'zh'; try { localStorage.setItem('jianghu.lang', lang); } catch (e) { /* */ } hud(); };
@@ -352,14 +370,15 @@ function step(dt) {
   G.clock += dt; tod = (tod + dt / 600) % 1; S.tod = tod;
   if (hitStop > 0) { hitStop -= dt; dt *= 0.15; }
   // ---- the hero
-  const fwdIn = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - touch.mz, sideIn = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + touch.mx;
-  if (dialog) { if (pressed('KeyE') || pressed('Space') || pressed('Enter')) nextLine(); }
+  pollPad(dt);
+  const fwdIn = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - touch.mz - pad.mz, sideIn = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + touch.mx + pad.mx;
+  if (dialog) { if (pressed('KeyE') || pressed('Space') || pressed('Enter') || pressed('KeyJ')) nextLine(); }
   if (pressed('KeyM')) toggleMap();
   const busy = !!dialog || mapOpen || player.dead > 0 || !!me.anim?.special;
-  let mx = 0, mz = 0; if (!busy) { const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw); mx = -sy * fwdIn - cy * sideIn; mz = -cy * fwdIn + sy * sideIn; const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; } }
+  let mx = 0, mz = 0; if (!busy) { const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw); mx = -sy * fwdIn + cy * sideIn; mz = -cy * fwdIn - sy * sideIn; const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; } }
   const run = me.h > 2.2 ? 7.2 : 6.6, inW = me.inWater, top = (inW ? 3.2 : run) * (keys.ShiftLeft ? 0.5 : 1), acc = me.onGround ? 46 : 34;
   me.vx += (mx * top - me.vx) * Math.min(1, dt * acc / top); me.vz += (mz * top - me.vz) * Math.min(1, dt * acc / top);
-  if (Math.hypot(mx, mz) > 0.1 && !me.anim) me.yaw += angWrap(Math.atan2(mx, mz) - me.yaw) * Math.min(1, dt * 12);
+  if (Math.hypot(mx, mz) > 0.15 && !me.anim) me.yaw += angWrap(Math.atan2(mx, mz) - me.yaw) * Math.min(1, dt * 10);
   if (me.onGround) player.jumps = 0;
   const jumpPress = !busy && (pressed('Space') || (touch.jump && false)); me.wantUp = keys.Space;
   if (jumpPress) {
@@ -430,5 +449,5 @@ function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now;
 // ---------------------------------------------------------------- start
 $('loading').hidden = true; hud(); requestAnimationFrame((t) => { last = t; loop(t); });
 if (!S.flags.metMonkey) setTimeout(() => { banner(T('龍門江湖', 'The Rivers and Lakes of Longmen'), '#f0c858', T('父親被誣陷下獄，兄弟倆踏上逃亡之路……', 'Their father framed and jailed, the brothers take to the road…')); }, 600);
-window.GAME = { S, G, keys, player, projs, fx, me: () => me, mate: () => mate, heroes, foes, Wd, V, tp(x, z) { me.x = x + 0.5; me.z = z + 0.5; me.y = V.top(Math.floor(x), Math.floor(z)) + 0.5; mate.x = me.x + 1; mate.z = me.z; mate.y = me.y; }, setTod(t) { tod = t; }, cam, step, render() { placeCamera(1); R.render(scene, camera); }, openDialog };
+window.GAME = { S, G, keys, player, projs, fx, camera, me: () => me, mate: () => mate, heroes, foes, Wd, V, tp(x, z) { me.x = x + 0.5; me.z = z + 0.5; me.y = V.top(Math.floor(x), Math.floor(z)) + 0.5; mate.x = me.x + 1; mate.z = me.z; mate.y = me.y; }, setTod(t) { tod = t; }, cam, step, render() { placeCamera(1); R.render(scene, camera); }, openDialog };
 window.DONE = true;

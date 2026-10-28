@@ -56,7 +56,9 @@ Pavilion**, where the truth is kept.
   sound and the music is a plucked zither. There is a map (M). The game saves itself, and there is Chinese and English.
 - **Controls:** WASD to move, Space to jump, J or left click to hit, K or right click for the special, E to talk or
   use, Q to swap brothers, M for the map; the mouse turns the camera (click to lock it). Touch: a stick on the left,
-  drag on the right to look, and buttons.
+  drag on the right to look, and buttons. **Controller:** the left stick or d-pad moves, the right stick looks, A
+  jumps (hold to glide), X hits, Y is the special, B talks, LB/RB swap brothers, Start or Back opens the map, and
+  the triggers zoom.
 
 ## How it is made
 
