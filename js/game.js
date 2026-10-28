@@ -226,11 +226,11 @@ function hitFoe(f, dmg, from, knock = 6, kind = 'light') {
 }
 let hitStop = 0;
 function playerAttack() {
-  if (me.anim || player.dead) return; const A = ATTACKS[me.CH.id === 'yirui' ? 'yirui' : 'yishuo'];
+  if (me.anim || player.dead > 0) return; const A = ATTACKS[me.CH.id === 'yirui' ? 'yirui' : 'yishuo'];
   me.anim = { keys: A.keys, len: A.len, t: 0, events: [{ t: A.hit, run: () => { SFX[A.sfx]?.(1); for (const f of [...foes, ...(xiao?.foe ? [xiao] : []), ...(masked ? [masked] : [])]) { if (!f.alive) continue; const dx = f.x - me.x, dz = f.z - me.z, d = Math.hypot(dx, dz), a = Math.abs(angWrap(Math.atan2(dx, dz) - me.yaw)); if (d < A.reach + f.r && a < A.arc && Math.abs(f.y - me.y) < 2.2) hitFoe(f, A.dmg, me, 3); } } }] };
 }
 function playerSpecial() {
-  if (me.anim || player.dead || player.qi < 1) { if (player.qi < 1) toast(T('內力不足', 'Not enough qi')); return; }
+  if (me.anim || player.dead > 0 || player.qi < 1) { if (player.qi < 1) toast(T('內力不足', 'Not enough qi')); return; }
   player.qi -= 1; const M = me.special, rate = 1.5;
   if (me.CH.id === 'yirui') {
     me.anim = { keys: M.keys, len: M.len, rate, t: 0, face: M.face, special: true, events: [
@@ -268,7 +268,7 @@ function stepProjectiles(dt) {
 }
 const targetsOf = (P) => P.owner === 'player' ? [...foes, ...(xiao?.foe ? [xiao] : []), ...(masked ? [masked] : [])].filter((f) => f.alive) : [];
 function hurtPlayer(dmg, from) {
-  if (player.inv > 0 || player.dead) return; player.hp -= dmg; player.inv = 1.0; me.flash = 0.2; me.hurtT = 0.35; const d = V3(me.x - from.x, 0, me.z - from.z).normalize(); me.vx = d.x * 8; me.vz = d.z * 8; me.vy = 6;
+  if (player.inv > 0 || player.dead > 0) return; player.hp -= dmg; player.inv = 1.0; me.flash = 0.2; me.hurtT = 0.35; const d = V3(me.x - from.x, 0, me.z - from.z).normalize(); me.vx = d.x * 8; me.vz = d.z * 8; me.vy = 6;
   SFX.thud(0.7); SFX.ouch(me.CH.id === 'yishuo', 'heavy'); fx.S.shake = 0.3; if (player.hp <= 0) { player.dead = 2.4; toast(T('倒下了……', 'You fall…')); }
 }
 const palmTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); g.ellipse(64, 80, 30, 34, 0, 0, Math.PI * 2); for (const [x, y, l, a] of [[38, 54, 30, -0.4], [52, 46, 38, -0.12], [66, 44, 40, 0.04], [80, 48, 35, 0.2], [96, 76, 26, 0.95]]) { g.save(); g.translate(x, y); g.rotate(a); g.roundRect(-7, -l, 14, l + 7, 7); g.restore(); } g.fill(); return new THREE.CanvasTexture(c); })();
@@ -394,7 +394,7 @@ function step(dt) {
   if (!busy && (pressed('KeyJ') || keys._atk)) playerAttack(); keys._atk = false;
   if (!busy && (pressed('KeyK') || keys._sp)) playerSpecial(); keys._sp = false;
   if (!dialog && pressed('KeyQ') && !me.anim) { const o = me; me = mate; mate = o; S.who = me.CH.id; toast(me.CH.name[lang]); hud(); }
-  if (player.dead > 0) { player.dead -= dt; me.vx *= 0.9; me.vz *= 0.9; if (player.dead <= 0) { player.hp = player.maxHp; player.qi = player.maxQi; const sp = S.flags.metBai ? { x: PL.town[0] + 0.5, z: PL.town[1] + 4.5 } : Wd.spots.startP; me.x = sp.x; me.z = sp.z; me.y = V.top(Math.floor(me.x), Math.floor(me.z)) + 0.5; mate.x = me.x + 1; mate.z = me.z; mate.y = me.y; toast(T('醒來時，已在安全的地方', 'You wake somewhere safe')); hud(); } }
+  if (player.dead > 0) { player.dead -= dt; me.vx *= 0.9; me.vz *= 0.9; if (player.dead <= 0) { player.dead = 0; me.anim = null; me.hurtT = 0; player.inv = 2; player.hp = player.maxHp; player.qi = player.maxQi; const sp = S.flags.metBai ? { x: PL.town[0] + 0.5, z: PL.town[1] + 4.5 } : Wd.spots.startP; me.x = sp.x; me.z = sp.z; me.y = V.top(Math.floor(me.x), Math.floor(me.z)) + 0.5; mate.x = me.x + 1; mate.z = me.z; mate.y = me.y; toast(T('醒來時，已在安全的地方', 'You wake somewhere safe')); hud(); } }
   moveFig(me, dt);
   player.inv = Math.max(0, player.inv - dt); me.hurtT = Math.max(0, me.hurtT - dt);
   player.qi = Math.min(player.maxQi, player.qi + dt / 7);
