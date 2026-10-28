@@ -1,7 +1,7 @@
 // The world in bricks: a grid of 1×1 bricks (each 0.6 wide and tall, the size of 2×2 studs), stored as one byte each.
 // It is drawn in chunks of 32×32 columns: only the faces that touch air (or water) are made, each tinted the brick's
 // colour (a touch lighter or darker brick to brick, like a real build), shaded by its side, and edged with a bevel so
-// every brick reads as a brick. Studs are added on the tops of the bricks near the player only.
+// every brick reads as a brick. Every top is painted with its studs; real ones stand on the bricks near the player.
 //   const V = new Voxels(W, H, D); V.set(x, y, z, B.GRASS); V.mesh(scene); V.studsNear(px, pz)
 import * as THREE from '../lib/three.module.min.js';
 
@@ -24,6 +24,21 @@ function bevelTex() { // a brick face: light in the middle, a darker rim, the so
   g.strokeStyle = 'rgba(255,255,255,0.0)'; const gr = g.createLinearGradient(0, 0, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,0.16)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.08)'); g.fillStyle = gr; g.fillRect(3, 3, 58, 58);
   bevel = new THREE.CanvasTexture(c); bevel.colorSpace = THREE.SRGBColorSpace; bevel.anisotropy = 8; return bevel;
 }
+// the top of a brick: the same face with its four studs painted on (lit from the upper left, a soft shadow to the lower
+// right), so the ground far off already reads as bricks; near the player the real studs stand on these very spots
+let studTop = null;
+function studTex() {
+  if (studTop) return studTop; const N = 128, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+  g.drawImage(bevelTex().image, 0, 0, N, N); const r = N * 0.15;
+  for (const [u, v] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+    const x = u * N, y = v * N;
+    g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.arc(x + r * 0.28, y + r * 0.28, r * 1.08, 0, Math.PI * 2); g.fill(); // the shadow it casts
+    const gr = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.75, '#f4f4f4'); gr.addColorStop(1, '#d8d8d8');
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = N / 96; g.stroke(); // its rim
+  }
+  studTop = new THREE.CanvasTexture(c); studTop.colorSpace = THREE.SRGBColorSpace; studTop.anisotropy = 16; return studTop;
+}
 // the six faces: normal, the four corners (as offsets in the cell), and the side's shade
 const FACES = [
   { n: [0, 1, 0], c: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], s: 1.0 }, { n: [0, -1, 0], c: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], s: 0.5 },
@@ -43,7 +58,7 @@ export class Voxels {
   fill(x0, y0, z0, x1, y1, z1, b) { for (let y = Math.max(0, y0); y <= Math.min(this.H - 1, y1); y++) for (let z = Math.max(0, z0); z <= Math.min(this.D - 1, z1); z++) for (let x = Math.max(0, x0); x <= Math.min(this.W - 1, x1); x++) this.a[(y * this.D + z) * this.W + x] = b; }
   // ---------------------------------------------------------------- drawing
   buildChunk(cx, cz) {
-    const C = this.CH, pos = [], col = [], uv = [], idx = [], wpos = [], widx = [], color = new THREE.Color(), tint = new THREE.Color();
+    const C = this.CH, pos = [], col = [], uv = [], idx = [], tidx = [], wpos = [], widx = [], color = new THREE.Color(), tint = new THREE.Color();
     for (let z = cz * C; z < Math.min(this.D, cz * C + C); z++) for (let x = cx * C; x < Math.min(this.W, cx * C + C); x++) {
       for (let y = 0; y < this.H; y++) {
         const b = this.a[(y * this.D + z) * this.W + x]; if (b === B.AIR) continue;
@@ -53,13 +68,15 @@ export class Voxels {
           const nb = this.get(x + F.n[0], y + F.n[1], z + F.n[2]); if (!SEE(nb) || (b === nb)) continue;
           const v = pos.length / 3; tint.copy(color).multiplyScalar(F.s * k);
           for (let i = 0; i < 4; i++) { const c = F.c[i]; pos.push(x + c[0], y + c[1], z + c[2]); col.push(tint.r, tint.g, tint.b); uv.push(UV[i][0], UV[i][1]); }
-          idx.push(v, v + 1, v + 2, v, v + 2, v + 3);
+          (F.n[1] === 1 && b !== B.LEAF && b !== B.LEAF2 && b !== B.BAMLEAF && b !== B.ROOF ? tidx : idx).push(v, v + 1, v + 2, v, v + 2, v + 3);
         }
       }
     }
     const G = new THREE.Group();
-    if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, this.mat ||= new THREE.MeshLambertMaterial({ vertexColors: true, map: bevelTex() })); m.castShadow = true; m.receiveShadow = true; G.add(m); }
+    const nSide = idx.length; for (const i of tidx) idx.push(i);
+    if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.addGroup(0, nSide, 0); g.addGroup(nSide, tidx.length, 1); g.computeVertexNormals(); g.computeBoundingSphere();
+      this.mat ||= new THREE.MeshLambertMaterial({ vertexColors: true, map: bevelTex() }); this.tmat ||= new THREE.MeshLambertMaterial({ vertexColors: true, map: studTex() });
+      const m = new THREE.Mesh(g, [this.mat, this.tmat]); m.castShadow = true; m.receiveShadow = true; G.add(m); }
     if (widx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(wpos, 3)); g.setIndex(widx); g.computeVertexNormals(); g.computeBoundingSphere();
       const m = new THREE.Mesh(g, this.wmat ||= new THREE.MeshPhongMaterial({ color: '#3a7cc0', transparent: true, opacity: 0.78, shininess: 30, specular: '#3a5a7a', depthWrite: false })); m.renderOrder = 2; G.add(m); }
     G.scale.setScalar(VS); return G;
@@ -73,10 +90,10 @@ export class Voxels {
   touch(x, z) { const C = this.CH; for (const [dx, dz] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) { const k = Math.floor((x + dx) / C) + ',' + Math.floor((z + dz) / C); if (this.chunks.has(k)) this.dirty.add(k); } }
   flush() { for (const k of this.dirty) { const [cx, cz] = k.split(',').map(Number), old = this.chunks.get(k); this.scene.remove(old); old.traverse((o) => o.geometry?.dispose()); const G = this.buildChunk(cx, cz); this.scene.add(G); this.chunks.set(k, G); } if (this.dirty.size) this.studKey = null; this.dirty.clear(); }
   // ---------------------------------------------------------------- the studs, near the player
-  studsNear(scene, px, pz, R = 26) {
+  studsNear(scene, px, pz, R = 40) {
     const key = Math.round(px / 6) + ',' + Math.round(pz / 6); if (key === this.studKey) return; this.studKey = key;
-    if (!this.studs) { const g = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12); g.translate(0, 0.05, 0); this.studs = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ vertexColors: false }), 24000); this.studs.castShadow = false; this.studs.receiveShadow = true; this.studs.frustumCulled = false; this.studs.scale.setScalar(VS); scene.add(this.studs); }
-    const m = new THREE.Matrix4(), c = new THREE.Color(); let n = 0, cap = 24000;
+    if (!this.studs) { const g = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12); g.translate(0, 0.05, 0); this.studs = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ vertexColors: false }), 32000); this.studs.castShadow = false; this.studs.receiveShadow = true; this.studs.frustumCulled = false; this.studs.scale.setScalar(VS); scene.add(this.studs); }
+    const m = new THREE.Matrix4(), c = new THREE.Color(); let n = 0, cap = 32000;
     const x0 = Math.max(0, Math.floor(px - R)), x1 = Math.min(this.W - 1, Math.ceil(px + R)), z0 = Math.max(0, Math.floor(pz - R)), z1 = Math.min(this.D - 1, Math.ceil(pz + R));
     for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
       if ((x - px) ** 2 + (z - pz) ** 2 > R * R) continue;
