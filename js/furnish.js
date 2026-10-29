@@ -148,5 +148,13 @@ export function furnish(C) {
   for (let k = 0; k < 18; k++) { const x = Math.floor(60 + R() * (W - 120)), z = Math.floor(60 + R() * (D - 120)); if (onGrass(x, z)) chest(x, z, R() < 0.25 ? 'page' : 'coins'); }
   // stone lanterns along the roads every so often
   let lastL = 0; for (let z = 4; z < D - 4; z += 3) for (let x = 4; x < W - 4; x += 3) { if (!isRoad[z * W + x] || isRoad[z * W + x + 3]) continue; if (R() < 0.04 && ++lastL) { const y = ground(x + 3, z); if (V.get(x + 3, y, z) === B.AIR && onGrass(x + 3, z)) lantern(x + 3, y, z); } }
+  // ---------------------------------------------------------------- 戰神台 the War God's platform: a round of dressed stone, a ring of
+  // pillars with braziers, a bronze statue's empty plinth in the middle (he is no statue)
+  { const [cx, cz] = P.arena, y0 = Hm[cz * W + cx] + 1;
+    for (let z = cz - 24; z <= cz + 24; z++) for (let x = cx - 24; x <= cx + 24; x++) { const r = Math.hypot(x - cx, z - cz); if (r > 23.5) continue; const top = r > 21 ? y0 - 1 : y0;
+      for (let y = top; y < top + 30; y++) V.set(x, y, z, B.AIR); for (let y = Math.min(Hm[z * W + x], top) - 2; y < top; y++) V.set(x, y, z, r > 21 ? B.GREY : (Math.floor(r) % 4 === 0 ? B.GOLD : (x + z) % 2 ? B.STONE : B.GREY)); }
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, x = Math.round(cx + Math.cos(a) * 19.5), z = Math.round(cz + Math.sin(a) * 19.5); box(x, y0, z, x + 1, y0 + 7, z + 1, B.STONE); box(x - 1, y0 + 8, z - 1, x + 2, y0 + 8, z + 2, B.DARK); V.set(x, y0 + 9, z, B.GLOW); V.set(x + 1, y0 + 9, z + 1, B.GLOW); }
+    box(cx - 2, y0, cz - 2, cx + 2, y0, cz + 2, B.DARK);
+    signs.push({ x: cx + 24, z: cz + 2, text: { zh: '戰神台：青銅戰神在此沉睡。踏上台者，與之一戰。', en: 'The War God’s Platform: the Bronze War God sleeps here. Whoever steps up must fight him.' } }); }
   return T;
 }

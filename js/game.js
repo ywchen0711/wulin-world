@@ -7,6 +7,8 @@
 import * as THREE from '../lib/three.module.min.js';
 import { VS, B, SOLID } from './voxel.js';
 import { buildWorld, regionAt, REGIONS, W as WW, D as DD, WL, P as PL } from './worldgen.js';
+import { actionEngine } from './action.js?v=2';
+import { bossEngine } from './bosses.js?v=2';
 import { makeFX } from './fx.js';
 import { SFX, wake, audio } from './sound.js';
 import { music } from './music.js';
@@ -166,7 +168,7 @@ heroes.yirui.special = YIDAO; heroes.yishuo.special = XUANFENG;
 let me = heroes[S.who] || heroes.yirui, mate = me === heroes.yirui ? heroes.yishuo : heroes.yirui;
 const start = S.pos || Wd.spots.startP; for (const h of [me, mate]) { h.x = start.x; h.y = start.y + 0.2; h.z = start.z + (h === mate ? 1.2 : 0); }
 const player = { hp: 6, maxHp: 6, qi: 3, maxQi: 3, inv: 0, jumps: 0, climbT: 0, dead: 0, trail: [] };
-const recalcMax = () => { const n = Object.keys(S.pages).length; const tr = TH.filter((t) => t.type === 'treasure' && S.treasures[t.id]); player.maxHp = 6 + 2 * Math.floor(n / 5) + 2 * tr.filter((t) => t.gives === 'hp').length; player.maxQi = 3 + Math.floor(n / 10) + tr.filter((t) => t.gives === 'qi').length; };
+const recalcMax = () => { const n = Object.keys(S.pages).length; const tr = TH.filter((t) => t.type === 'treasure' && S.treasures[t.id]); player.maxHp = 6 + 2 * Math.floor(n / 5) + 2 * tr.filter((t) => t.gives === 'hp').length; player.maxQi = 3 + Math.floor(n / 10) + tr.filter((t) => t.gives === 'qi').length; for (const so of Object.values(S.souls || {})) { player.maxHp += so.hp || 0; player.maxQi += so.qi || 0; } };
 recalcMax(); player.hp = player.maxHp;
 const npcs = Wd.npcs.map((n) => makeFigure(n.cast, { ...n, npc: n.id }));
 const foes = [];
@@ -212,7 +214,7 @@ addEventListener('keydown', (e) => { if (e.repeat) { keys[e.code] = true; return
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 const pressed = (c) => { if (keys['_' + c]) { keys['_' + c] = false; return true; } return false; };
 cv.addEventListener('click', () => { wake(); music.start(); if (!matchMedia('(pointer: coarse)').matches && document.pointerLockElement !== cv) cv.requestPointerLock?.(); });
-cv.addEventListener('mousedown', (e) => { if (document.pointerLockElement === cv) { if (e.button === 0) keys._atk = true; if (e.button === 2) keys._sp = true; } });
+cv.addEventListener('mousedown', (e) => { if (document.pointerLockElement === cv) { if (e.button === 0) keys._atk = true; if (e.button === 2) keys._sp = true; if (e.button === 1) keys._Tab = true; } });
 cv.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('mousemove', (e) => { if (document.pointerLockElement === cv) { mouseDX += e.movementX; mouseDY += e.movementY; } });
 addEventListener('wheel', (e) => { wheel += e.deltaY; }, { passive: true });
@@ -227,14 +229,13 @@ addEventListener('wheel', (e) => { wheel += e.deltaY; }, { passive: true });
 // a game controller (the standard layout): A jump, X hit, Y special, B talk/use, LB/RB swap brothers, Back/Start map;
 // the left stick (or the d-pad) moves, the right stick turns the camera, the triggers zoom
 const pad = { prev: [], mx: 0, mz: 0, on: false };
-const PADKEYS = { 0: 'Space', 2: 'KeyJ', 3: 'KeyK', 1: 'KeyE', 4: 'KeyQ', 5: 'KeyQ', 8: 'KeyM', 9: 'KeyM' };
+const PADKEYS = { 0: 'Space', 2: 'KeyJ', 3: 'KeyK', 1: 'KeyE', 4: 'KeyQ', 5: 'KeyL', 6: 'Tab', 7: 'ShiftLeft', 8: 'KeyM', 9: 'KeyM', 10: 'KeyR', 11: 'Tab' };
 function pollPad(dt) {
   const gp = [...(navigator.getGamepads?.() || [])].find((g) => g && g.connected); if (!gp) { pad.mx = pad.mz = 0; return; }
   if (!pad.on) { pad.on = true; toast(T('已連接手把', 'Controller connected')); wake(); music.start(); }
   const dz = (v) => (Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v) * 0.18) / 0.82), b = (i) => !!gp.buttons[i]?.pressed;
   pad.mx = dz(gp.axes[0] || 0) + (b(15) ? 1 : 0) - (b(14) ? 1 : 0); pad.mz = dz(gp.axes[1] || 0) + (b(13) ? 1 : 0) - (b(12) ? 1 : 0);
   mouseDX += dz(gp.axes[2] || 0) * 900 * dt; mouseDY += dz(gp.axes[3] || 0) * 600 * dt;
-  wheel += ((gp.buttons[6]?.value || 0) - (gp.buttons[7]?.value || 0)) * 900 * dt;
   for (const [i, code] of Object.entries(PADKEYS)) { const now = b(+i); if (now && !pad.prev[i]) { keys[code] = true; keys['_' + code] = true; } if (!now && pad.prev[i]) keys[code] = false; pad.prev[i] = now; }
   if (b(0)) keys.Space = true; // held, for gliding and swimming up
   const dir = pad.mz < -0.55 ? -1 : pad.mz > 0.55 ? 1 : 0; if (dir && dir !== pad.dir) keys[dir < 0 ? '_ArrowUp' : '_ArrowDown'] = true; pad.dir = dir; // the d-pad or stick, a step at a time in a menu
@@ -245,8 +246,11 @@ const cam = { yaw: Math.PI, pitch: 0.42, dist: 10, pos: V3(), look: V3() };
 function placeCamera(dt) {
   cam.yaw -= mouseDX * 0.0032; cam.pitch = clamp(cam.pitch + mouseDY * 0.0026, -0.25, 1.2); mouseDX = mouseDY = 0; cam.dist = clamp(cam.dist * Math.exp(wheel * 0.001), 3, window.CAMD || 16); wheel = 0;
   cam.footY = cam.footY == null ? me.y : cam.footY + (me.y - cam.footY) * Math.min(1, dt * (Math.abs(me.y - cam.footY) > 4 ? 30 : 9));
-  const head = V3(me.x, cam.footY + me.h * 0.85, me.z), want = V3(Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), Math.cos(cam.yaw) * Math.cos(cam.pitch));
-  let d = cam.dist; for (let s = 0.4; s < cam.dist; s += 0.25) { const p = head.clone().addScaledVector(want, s); if (solidAt(p.x, p.y, p.z)) { d = Math.max(1.2, s - 0.5); break; } } // pulled in before walls
+  if (ACT.camYaw() != null) cam.yaw += angWrap(ACT.camYaw() - cam.yaw) * Math.min(1, dt * 5);
+  const boss = BOSS.active(); if (boss) cam.pitch += (Math.max(cam.pitch, 0.42) - cam.pitch) * Math.min(1, dt * 3);
+  const head = V3(me.x, cam.footY + me.h * 0.85, me.z); if (boss) { const bk = 0.32; head.x += (boss.x - me.x) * bk * 0.5; head.z += (boss.z - me.z) * bk * 0.5; head.y += Math.min(4, (boss.h || 4) * 0.25); }
+  const want = V3(Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), Math.cos(cam.yaw) * Math.cos(cam.pitch));
+  const wantD = boss ? Math.max(cam.dist, 17) : cam.dist; let d = wantD; for (let s = 0.4; s < wantD; s += 0.25) { const p = head.clone().addScaledVector(want, s); if (solidAt(p.x, p.y, p.z)) { d = Math.max(1.2, s - 0.5); break; } } // pulled in before walls
   const pos = head.clone().addScaledVector(want, d); cam.pos.lerp(pos, Math.min(1, dt * 12)); cam.look.lerp(head, Math.min(1, dt * 14));
   camera.position.copy(cam.pos).multiplyScalar(VS); camera.lookAt(cam.look.clone().multiplyScalar(VS)); sky.position.copy(camera.position);
   const sh = fx.S.shake * 0.15; camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh;
@@ -264,6 +268,7 @@ function poseFig(f, dt, clock) {
     const sp = Math.hypot(f.vx, f.vz); f.walkPh += sp * dt * (f.h > 2.2 ? 1.05 : 1.35); const k = clamp(sp / 4, 0, 1), run = clamp((sp - 5) / 3, 0, 1), s = Math.sin(f.walkPh * 1.9);
     if (sp > 0.3 && f.onGround) Object.assign(p, { hipR: s * (0.6 + 0.3 * run) * k, hipL: -s * (0.6 + 0.3 * run) * k, armR: -0.2 - s * (0.5 + 0.5 * run) * k - run * 0.35, armL: -0.2 + s * (0.5 + 0.5 * run) * k - run * 0.35, outR: 0.12, outL: 0.12, tilt: (0.05 + 0.18 * run) * k, roll: s * 0.05 * k, y: Math.abs(Math.cos(f.walkPh * 1.9)) * 0.03 * k, head: 0, yaw: 0 });
     if (!f.onGround && !f.inWater) { const up = f.vy > 0; Object.assign(p, f.climbing ? { armR: -2.8 + Math.sin(clock * 12) * 0.4, armL: -2.8 - Math.sin(clock * 12) * 0.4, hipR: Math.sin(clock * 12) * 0.6, hipL: -Math.sin(clock * 12) * 0.6, tilt: 0.1 } : f.gliding ? { armR: -1.4, outR: 1.3, armL: -1.4, outL: 1.3, hipR: 0.3, hipL: -0.2, tilt: 0.25 } : { armR: up ? -2.4 : -1.2, outR: 0.5, armL: up ? -0.4 : -1.4, outL: 0.5, hipR: up ? -1.0 : -0.3, hipL: up ? 0.4 : -0.2, tilt: up ? -0.05 : 0.08 }); }
+    if (f.chargePose) { const k = Math.min(1, 0.45 + f.chargePose.k); for (const q in f.chargePose.p) p[q] = (p[q] || 0) + (f.chargePose.p[q] - (p[q] || 0)) * k; p.y = (p.y || 0) + Math.sin(clock * 40) * 0.006 * f.chargePose.k; }
     if (f.inWater) Object.assign(p, { armR: -2.2 + Math.sin(clock * 6) * 1.2, armL: -2.2 - Math.sin(clock * 6) * 1.2, outR: 0.4, outL: 0.4, hipR: Math.sin(clock * 8) * 0.5, hipL: -Math.sin(clock * 8) * 0.5, tilt: 0.5, y: -0.25 });
   }
   if (f.ko) { p = { ...p, tilt: -1.5 * Math.min(1, f.koT * 3), y: 0.15 * Math.min(1, f.koT * 3), armR: -0.4, outR: 1, armL: -0.4, outL: 1 }; face = { blink: 1, mouth: { open: 0.3, round: 1 } }; }
@@ -314,13 +319,13 @@ function playerSpecial() {
 function stepProjectiles(dt) {
   for (let i = projs.length - 1; i >= 0; i--) {
     const P = projs[i]; P.life -= dt;
-    if (P.kind === 'qi') { const Wv = fx.S.wave; if (!Wv || P.life <= 0) { projs.splice(i, 1); continue; } const p = Wv.p.clone().divideScalar(VS); hitThings(p, 1.2, null, 0); for (const f of targetsOf(P)) if (!P.hit.has(f) && Math.hypot(f.x - p.x, f.z - p.z) < 1.4 && Math.abs(f.y + 1 - p.y) < 2.5) { P.hit.add(f); hitFoe(f, P.dmg, { x: p.x - Wv.d.x, z: p.z - Wv.d.z }, 9, 'heavy'); } continue; }
+    if (P.kind === 'qi') { const Wv = fx.S.wave; if (!Wv || P.life <= 0) { projs.splice(i, 1); continue; } const p = Wv.p.clone().divideScalar(VS); hitThings(p, 1.2, null, 0); if (!P.bossHit && BOSS.projHit(p, 1.6, P.dmg)) P.bossHit = true; for (const f of targetsOf(P)) if (!P.hit.has(f) && Math.hypot(f.x - p.x, f.z - p.z) < 1.4 && Math.abs(f.y + 1 - p.y) < 2.5) { P.hit.add(f); hitFoe(f, P.dmg, { x: p.x - Wv.d.x, z: p.z - Wv.d.z }, 9, 'heavy'); } continue; }
     if (P.kind === 'ball') {
       const ball = heroes.yishuo.hero.ball;
       if (!P.back && P.life <= 0) P.back = true;
       if (P.back) { const to = V3(heroes.yishuo.x, heroes.yishuo.y + 0.5, heroes.yishuo.z), d = to.clone().sub(P.p); if (d.length() < 0.8) { projs.splice(i, 1); continue; } P.v.lerp(d.normalize().multiplyScalar(16), Math.min(1, dt * 6)); }
       P.p.addScaledVector(P.v, dt); if (solidAt(P.p.x, P.p.y, P.p.z)) { P.back = true; P.v.multiplyScalar(-0.5); }
-      ball.position.copy(P.p).multiplyScalar(VS); heroes.yishuo.hero.spinBall(dt * 40, V3(P.v.z, 0, -P.v.x)); hitThings(P.p, 0.9, null, 0);
+      ball.position.copy(P.p).multiplyScalar(VS); heroes.yishuo.hero.spinBall(dt * 40, V3(P.v.z, 0, -P.v.x)); hitThings(P.p, 0.9, null, 0); if (!P.bossHit && BOSS.projHit(P.p, 1.0, P.dmg)) { P.bossHit = true; P.back = true; }
       if (Math.random() < 0.8) fx.puff(P.p.clone().multiplyScalar(VS), V3((Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5) * 2), 0.5, [0.6, 1.2, 0.9], 1.5, 0);
       for (const f of targetsOf(P)) if (!P.hit.has(f) && Math.hypot(f.x - P.p.x, f.z - P.p.z) < 1.1 && P.p.y > f.y - 0.3 && P.p.y < f.y + f.h) { P.hit.add(f); hitFoe(f, P.dmg, { x: P.p.x - P.v.x, z: P.p.z - P.v.z }, 10, 'heavy'); }
       continue;
@@ -335,7 +340,8 @@ function stepProjectiles(dt) {
 }
 const targetsOf = (P) => P.owner === 'player' ? [...foes, ...(xiao?.foe ? [xiao] : []), ...(masked ? [masked] : [])].filter((f) => f.alive) : [];
 function hurtPlayer(dmg, from) {
-  if (player.inv > 0 || player.dead > 0) return; player.hp -= dmg; player.inv = 1.0; me.flash = 0.2; me.hurtT = 0.35; const d = V3(me.x - from.x, 0, me.z - from.z).normalize(); me.vx = d.x * 8; me.vz = d.z * 8; me.vy = 6;
+  if (ACT.evade()) return;
+  if (player.inv > 0 || player.dead > 0) return; ACT.gainRage(8); player.hp -= dmg; player.inv = 1.0; me.flash = 0.2; me.hurtT = 0.35; const d = V3(me.x - from.x, 0, me.z - from.z).normalize(); me.vx = d.x * 8; me.vz = d.z * 8; me.vy = 6;
   SFX.thud(0.7); SFX.ouch(me.CH.id === 'yishuo', 'heavy'); fx.S.shake = 0.3; if (player.hp <= 0) { player.dead = 2.4; toast(T('倒下了……', 'You fall…')); }
 }
 const palmTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); g.ellipse(64, 80, 30, 34, 0, 0, Math.PI * 2); for (const [x, y, l, a] of [[38, 54, 30, -0.4], [52, 46, 38, -0.12], [66, 44, 40, 0.04], [80, 48, 35, 0.2], [96, 76, 26, 0.95]]) { g.save(); g.translate(x, y); g.rotate(a); g.roundRect(-7, -l, 14, l + 7, 7); g.restore(); } g.fill(); return new THREE.CanvasTexture(c); })();
@@ -343,6 +349,7 @@ function foePalm(f, color = '#ff4a3a', tint) { const fw = V3(me.x - f.x, 0, me.z
 // the foes' minds: idle and wander near home, see you, chase, wind up and strike, go back if you run far
 function stepFoe(f, dt) {
   if (f.ko) { f.koT += dt; f.vx *= 0.9; f.vz *= 0.9; if (f.koT > 4 && !f.boss) { f.F.root.visible = false; f.deadT = (f.deadT || 0) + dt; if (f.deadT > 50 && Math.hypot(me.x - f.home[0], me.z - f.home[1]) > 50) { f.ko = false; f.alive = true; f.hp = f.maxHp; f.x = f.home[0]; f.z = f.home[1]; f.y = V.top(Math.floor(f.x), Math.floor(f.z)); f.F.root.visible = true; f.deadT = 0; f.state = 'idle'; } } return; }
+  if (f.stun > 0) { f.stun -= dt; f.vx *= 0.9; f.vz *= 0.9; f.attacking = false; return; }
   const dx = me.x - f.x, dz = me.z - f.z, d = Math.hypot(dx, dz), sees = !player.dead && d < (f.boss ? 18 : 13) && Math.abs(me.y - f.y) < 6, homeD = Math.hypot(f.x - f.home[0], f.z - f.home[1]);
   f.cool -= dt; f.stateT -= dt; let want = 0, dir = f.yaw;
   if (f.state === 'idle') { if (sees) { f.state = 'chase'; if (!f.shouted) { f.shouted = true; SFX.ouch(false, 'light'); } } else if (f.stateT < 0) { f.state = 'wander'; f.stateT = 2 + Math.random() * 3; f.wDir = Math.random() * Math.PI * 2; if (homeD > 6) f.wDir = Math.atan2(f.home[0] - f.x, f.home[1] - f.z); } }
@@ -351,13 +358,13 @@ function stepFoe(f, dt) {
     dir = Math.atan2(dx, dz); want = f.boss ? 4.6 : 4.2;
     if (!sees && (d > 22 || homeD > 30)) { f.state = 'home'; f.shouted = false; }
     const reach = f.boss ? 2.6 : 1.9;
-    if (d < reach && f.cool <= 0 && !f.anim) { // the blow, telegraphed
-      f.cool = f.boss ? 1.6 : 1.8; want = 0; const big = f.CH.id === 'heixiong' || f.CH.id === 'xiaotian' || f.CH.id === 'masked';
+    if (d < reach && f.cool <= 0 && !f.anim && ACT.token(f)) { // the blow, telegraphed: a glint, then the swing
+      f.cool = f.boss ? 1.6 : 1.8; want = 0; const big = f.CH.id === 'heixiong' || f.CH.id === 'xiaotian' || f.CH.id === 'masked'; f.attacking = true; ACT.glint(f, big ? '#ff6a4a' : '#ffe08a', big);
       f.anim = { len: big ? 1.1 : 0.9, t: 0, keys: [{ t: 0, p: { armR: 0.15, outR: 0.5, armL: 0.15, outL: 0.5 } }, { t: big ? 0.5 : 0.4, ease: 'out', p: big ? { armR: -3.0, outR: 0.1, armL: -1.0, tilt: -0.2 } : { armR: 0.7, outR: 0.4, armL: -1.2, tilt: -0.08, yaw: 0.45 } }, { t: big ? 0.65 : 0.52, ease: 'in', p: big ? { armR: -0.5, armL: 0.4, tilt: 0.35, fwd: 0.35, hipR: -0.7, hipL: 0.45 } : { armR: -1.6, armL: 0.5, tilt: 0.25, yaw: -0.25, fwd: 0.3, hipR: -0.6, hipL: 0.4 } }, { t: big ? 1.1 : 0.9, p: { armR: 0.15, outR: 0.5, armL: 0.15, outL: 0.5 } }],
-        face: () => ({ browIn: 1, mouth: { open: 0.7, wide: 0.8 } }), events: [{ t: big ? 0.6 : 0.48, run: () => { SFX.swing(1); const ddx = me.x - f.x, ddz = me.z - f.z; if (Math.hypot(ddx, ddz) < reach + 0.6 && Math.abs(angWrap(Math.atan2(ddx, ddz) - f.yaw)) < 1.2) hurtPlayer(big ? 2 : 1, f); if (big) fx.ringAt(V3(f.x, f.y, f.z).multiplyScalar(VS), 1.2); } }] };
+        face: () => ({ browIn: 1, mouth: { open: 0.7, wide: 0.8 } }), end: () => { f.attacking = false; }, events: [{ t: big ? 0.6 : 0.48, run: () => { SFX.swing(1); const ddx = me.x - f.x, ddz = me.z - f.z; if (Math.hypot(ddx, ddz) < reach + 0.6 && Math.abs(angWrap(Math.atan2(ddx, ddz) - f.yaw)) < 1.2) hurtPlayer(big ? 2 : 1, f); if (big) fx.ringAt(V3(f.x, f.y, f.z).multiplyScalar(VS), 1.2); } }] };
     }
     // the masters' wind of the palm, from further off
-    if ((f.CH.id === 'xiaotian' || f.CH.id === 'masked') && d > 4 && d < 16 && f.cool <= 0 && !f.anim) { f.cool = 2.6; f.anim = { len: 0.9, t: 0, keys: [{ t: 0, p: {} }, { t: 0.45, p: { armR: 0.75, outR: 0.25, armL: 0.75, outL: 0.25, hipR: -0.6, hipL: 0.55, y: -0.09 } }, { t: 0.55, ease: 'in', p: { armR: -1.62, outR: -0.22, armL: -1.62, outL: -0.22, hipR: -0.95, hipL: 0.6, tilt: 0.28 } }, { t: 0.9, p: {} }], face: () => ({ smirk: 1, eyes: 0.6 }), events: [{ t: 0.5, run: () => f.CH.id === 'masked' ? foePalm(f, '#b04aff', [0.8, 0.4, 1.4]) : foePalm(f) }] }; f.hero.setGlow?.(1); }
+    if ((f.CH.id === 'xiaotian' || f.CH.id === 'masked') && d > 4 && d < 16 && f.cool <= 0 && !f.anim) { f.cool = 2.6; ACT.glint(f, '#ff6a4a', true); f.anim = { len: 0.9, t: 0, keys: [{ t: 0, p: {} }, { t: 0.45, p: { armR: 0.75, outR: 0.25, armL: 0.75, outL: 0.25, hipR: -0.6, hipL: 0.55, y: -0.09 } }, { t: 0.55, ease: 'in', p: { armR: -1.62, outR: -0.22, armL: -1.62, outL: -0.22, hipR: -0.95, hipL: 0.6, tilt: 0.28 } }, { t: 0.9, p: {} }], face: () => ({ smirk: 1, eyes: 0.6 }), events: [{ t: 0.5, run: () => f.CH.id === 'masked' ? foePalm(f, '#b04aff', [0.8, 0.4, 1.4]) : foePalm(f) }] }; f.hero.setGlow?.(1); }
   } else if (f.state === 'home') { dir = Math.atan2(f.home[0] - f.x, f.home[1] - f.z); want = 2.4; if (homeD < 2) { f.state = 'idle'; f.stateT = 2; } if (sees && d < 8) f.state = 'chase'; }
   if (f.anim) want = 0;
   f.yaw += angWrap(dir - f.yaw) * Math.min(1, dt * 6);
@@ -386,6 +393,13 @@ const G = {
   openGate() { const [gx, gz] = Wd.spots.gate; for (let y = WL; y <= WL + 3; y++) for (let x = gx - 1; x <= gx + 1; x++) { V.set(x, y, gz - 2, B.AIR); } V.touch(gx, gz - 2); V.flush(); SFX.gong(1); fx.S.shake = 0.5; banner(T('天機閣，開了。', 'The Stratagem Pavilion opens.'), '#d8a838');
     if (!S.beaten.masked && !masked) { const [ix, iz] = Wd.spots.inner; masked = makeFigure('masked', { x: ix + 0.5, y: WL, z: iz + 0.5, npc: 'masked', yaw: 0 }); npcs.push(masked); } save(); },
 };
+
+// ---------------------------------------------------------------- 操作感 and the giants (js/action.js, js/bosses.js)
+const allFoes = () => [...foes, ...(xiao?.foe ? [xiao] : []), ...(masked?.foe ? [masked] : [])];
+const ACT = actionEngine({ me: () => me, player, foes: allFoes, bosses: () => (typeof BOSS !== 'undefined' ? BOSS.list() : []), hitFoe, fx, SFX, scene, VS, T, lang: () => lang, hitThings, football: () => football.kick(), clock: () => G.clock,
+  shake: (n) => { fx.S.shake = Math.max(fx.S.shake, n); }, hitStop: (n) => { hitStop = Math.max(hitStop, n); }, drop, angWrap, cam });
+const BOSS = bossEngine({ VS, scene, V, B, WL, PL, me: () => me, player, hurt: (dmg, from) => hurtPlayer(dmg, from), fx, SFX, banner, toast, T, lang: () => lang, S, save, hud: () => hud(), drop, recalcMax, spawnFoe,
+  foeRate: () => ACT.foeRate(), shake: (n) => { fx.S.shake = Math.max(fx.S.shake, n); }, hitStop: (n) => { hitStop = Math.max(hitStop, n); }, flash: ACT.flash, gainRage: ACT.gainRage, slow: (d) => ACT.slowmo(d), lockOn: (b) => ACT.lockOn(b) });
 
 // ---------------------------------------------------------------- a choice to make: a list, picked with up/down and use (or a click)
 let choice = null;
@@ -449,7 +463,7 @@ function hud() {
   $('who').textContent = me.CH.name[lang]; $('skills').innerHTML = Object.entries(SKILLS).map(([k, s]) => `<span class="${S.skills[k] ? 'on' : ''}">${s[lang]}</span>`).join('');
   const o = objective(S); $('goal').textContent = o[lang];
   $('tUse').textContent = T('對話', 'Talk'); $('tSwap').textContent = T('換人', 'Swap'); $('tAtk').textContent = T('攻擊', 'Hit'); $('tSp').textContent = me.CH.id === 'yirui' ? T('一刀', 'Cut') : T('旋風', 'Whirl'); $('tMap').textContent = T('地圖', 'Map');
-  $('help').textContent = pad.on ? T('手把：左搖桿 移動・右搖桿 視角・A 跳・X 攻擊・Y 絕招・B 對話・LB/RB 換人・Start 地圖', 'Controller: left stick move · right stick look · A jump · X hit · Y special · B talk · LB/RB swap · Start map') : T('WASD 移動・空白鍵 跳・J/左鍵 攻擊・K/右鍵 絕招・E 對話・Q 換人・M 地圖・滑鼠轉視角', 'WASD move · Space jump · J/left click hit · K/right click special · E talk · Q swap · M map · mouse looks');
+  $('help').textContent = pad.on ? T('手把：左搖桿 移動・右搖桿 視角・A 跳・X 連擊・RB 重擊(按住蓄力)・RT 翻滾・LT 鎖定・Y 絕招・L3 龍門怒・B 對話/終結・LB 換人・Start 地圖', 'Pad: left stick move · right stick look · A jump · X combo · RB heavy (hold to charge) · RT roll · LT lock on · Y special · L3 rage · B talk/finish · LB swap · Start map') : T('WASD 移動・空白鍵 跳・J/左鍵 連擊（空中下劈）・L 重擊（按住蓄力）・Shift 翻滾（剛好躲過會時間變慢）・Tab/中鍵 鎖定・K/右鍵 絕招・R 龍門怒・E 對話/終結技・Q 換人・M 地圖', 'WASD move · Space jump · J/left click combo (plunge in the air) · L heavy (hold to charge) · Shift roll (a perfect dodge slows time) · Tab/middle click lock on · K/right click special · R rage · E talk/finish · Q swap · M map');
   $('lang').textContent = lang === 'zh' ? 'EN' : '中';
 }
 $('lang').onclick = () => { lang = lang === 'zh' ? 'en' : 'zh'; try { localStorage.setItem('jianghu.lang', lang); } catch (e) { /* */ } hud(); };
@@ -461,6 +475,7 @@ function drawMap() {
   mg.lineJoin = 'round'; for (const r of REGIONS) { const t = r.name[lang].split('・')[0]; mg.lineWidth = 5; mg.strokeStyle = 'rgba(20,14,10,0.85)'; mg.strokeText(t, r.at[0] * s, r.at[1] * s - 10 * s); mg.fillStyle = '#fff4d8'; mg.fillText(t, r.at[0] * s, r.at[1] * s - 10 * s); }
   for (const p of Wd.pages) if (!S.pages[p.id] && Object.keys(S.pages).length >= 20) { mg.fillStyle = '#ffe8a0'; mg.fillRect(p.x * s - 2, p.z * s - 2, 4, 4); } // with twenty found, the rest show on the map
   for (const t of TH) { if (t.type === 'station') { mg.fillStyle = S.stations[t.id] ? '#f0c858' : 'rgba(240,200,88,0.4)'; mg.fillRect(t.x * s - 4, t.z * s - 4, 8, 8); } if (t.type === 'shrine') { mg.fillStyle = '#9ad8ff'; mg.beginPath(); mg.arc(t.x * s, t.z * s, 3, 0, Math.PI * 2); mg.fill(); } }
+  BOSS.drawMap(mg, s);
   const dot = (x, z, c, r = 5) => { mg.fillStyle = c; mg.beginPath(); mg.arc(x * s, z * s, r, 0, Math.PI * 2); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.stroke(); };
   dot(mate.x, mate.z, mate.CH.spec.colors.top, 4); dot(me.x, me.z, me.CH.spec.colors.top, 6);
   mg.strokeStyle = '#fff'; mg.lineWidth = 2; mg.beginPath(); mg.moveTo(me.x * s, me.z * s); mg.lineTo((me.x + Math.sin(me.yaw) * 10) * s, (me.z + Math.cos(me.yaw) * 10) * s); mg.stroke();
@@ -475,6 +490,7 @@ let region = null, last = performance.now(), tod = S.tod ?? 0.3, studT = 0;
 function step(dt) {
   G.clock += dt; tod = (tod + dt / 600) % 1; S.tod = tod;
   if (hitStop > 0) { hitStop -= dt; dt *= 0.15; }
+  dt *= ACT.worldRate();
   // ---- the hero
   pollPad(dt);
   const fwdIn = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - touch.mz - pad.mz, sideIn = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + touch.mx + pad.mx;
@@ -483,9 +499,9 @@ function step(dt) {
   if (pressed('KeyM')) toggleMap();
   const busy = !!dialog || !!choice || mapOpen || player.dead > 0 || !!me.anim?.special;
   let mx = 0, mz = 0; if (!busy) { const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw); mx = -sy * fwdIn + cy * sideIn; mz = -cy * fwdIn - sy * sideIn; const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; } }
-  const run = me.h > 2.2 ? 7.2 : 6.6, inW = me.inWater, top = (inW ? 3.2 : run) * (keys.ShiftLeft ? 0.5 : 1), acc = me.onGround ? 46 : 34;
-  me.vx += (mx * top - me.vx) * Math.min(1, dt * acc / top); me.vz += (mz * top - me.vz) * Math.min(1, dt * acc / top);
-  if (Math.hypot(mx, mz) > 0.15 && !me.anim) me.yaw += angWrap(Math.atan2(mx, mz) - me.yaw) * Math.min(1, dt * 10);
+  const run = me.h > 2.2 ? 7.2 : 6.6, inW = me.inWater, top = inW ? 3.2 : run, acc = me.onGround ? 46 : 34;
+  if (!ACT.busy() && !(me.anim && !me.anim.special)) { me.vx += (mx * top - me.vx) * Math.min(1, dt * acc / top); me.vz += (mz * top - me.vz) * Math.min(1, dt * acc / top); }
+  if (Math.hypot(mx, mz) > 0.15 && !me.anim && !ACT.busy() && !ACT.target()) me.yaw += angWrap(Math.atan2(mx, mz) - me.yaw) * Math.min(1, dt * 10);
   if (me.onGround) player.jumps = 0;
   const jumpPress = !busy && (pressed('Space') || (touch.jump && false)); me.wantUp = keys.Space;
   if (jumpPress) {
@@ -498,10 +514,14 @@ function step(dt) {
   const fwx = Math.sin(me.yaw), fwz = Math.cos(me.yaw), wallAhead = solidAt(me.x + fwx * 0.7, me.y + 1.2, me.z + fwz * 0.7);
   me.climbing = S.skills.climb && !me.onGround && wallAhead && Math.hypot(mx, mz) > 0.3 && player.climbT < 4.5 && !inW;
   if (me.climbing) { player.climbT += dt; if (Math.random() < 0.3) fx.puff(V3(me.x + fwx * 0.4, me.y + 0.5, me.z + fwz * 0.4).multiplyScalar(VS), V3(0, -1, 0), 0.4, [0.7, 0.6, 0.5], 2, 2); } if (me.onGround) player.climbT = 0;
-  if (!busy && (pressed('KeyJ') || keys._atk)) playerAttack(); keys._atk = false;
+  if (!busy && (pressed('KeyJ') || keys._atk)) ACT.light(); keys._atk = false;
+  if (!busy && pressed('KeyL')) ACT.heavyDown(); if (!keys.KeyL && ACT.charging()) ACT.heavyUp();
+  if (!busy && (pressed('ShiftLeft') || pressed('ShiftRight') || pressed('KeyC'))) ACT.dodge(mx, mz);
+  if (pressed('Tab')) ACT.toggleLock(); if (!busy && pressed('KeyR')) ACT.rage();
   if (!busy && (pressed('KeyK') || keys._sp)) playerSpecial(); keys._sp = false;
   if (!dialog && pressed('KeyQ') && !me.anim) { const o = me; me = mate; mate = o; S.who = me.CH.id; toast(me.CH.name[lang]); hud(); }
   if (player.dead > 0) { player.dead -= dt; me.vx *= 0.9; me.vz *= 0.9; if (player.dead <= 0) { player.dead = 0; me.anim = null; me.hurtT = 0; player.inv = 2; player.hp = player.maxHp; player.qi = player.maxQi; const sp = S.shrine || (S.flags.metBai ? { x: PL.town[0] + 0.5, z: PL.town[1] + 4.5 } : Wd.spots.startP); me.x = sp.x; me.z = sp.z; me.y = V.top(Math.floor(me.x), Math.floor(me.z)) + 0.5; mate.x = me.x + 1; mate.z = me.z; mate.y = me.y; toast(T('醒來時，已在安全的地方', 'You wake somewhere safe')); hud(); } }
+  ACT.step(dt, { moving: Math.hypot(mx, mz) > 0.15 });
   moveFig(me, dt);
   player.inv = Math.max(0, player.inv - dt); me.hurtT = Math.max(0, me.hurtT - dt);
   player.qi = Math.min(player.maxQi, player.qi + dt / 7);
@@ -514,9 +534,9 @@ function step(dt) {
   // ---- Yi Shuo's ball at his feet (when it is not flying)
   if (!projs.some((p) => p.kind === 'ball')) { const s = heroes.yishuo, bh = s.hero, fw = V3(Math.sin(s.yaw), 0, Math.cos(s.yaw)), at = V3(s.x, s.y + BALL_R / VS, s.z).addScaledVector(fw, 0.75); bh.ball.position.copy(at).multiplyScalar(VS); bh.spinBall(Math.hypot(s.vx, s.vz) * dt * 4, V3(Math.cos(s.yaw), 0, -Math.sin(s.yaw))); }
   // ---- foes, people
-  for (const f of [...foes, ...(xiao?.foe ? [xiao] : []), ...(masked?.foe ? [masked] : [])]) { if (Math.hypot(f.x - me.x, f.z - me.z) > 70) continue; stepFoe(f, dt); moveFig(f, dt); f.hurtT = Math.max(0, f.hurtT - dt); }
+  const fr = ACT.foeRate(); for (const f of [...foes, ...(xiao?.foe ? [xiao] : []), ...(masked?.foe ? [masked] : [])]) { if (Math.hypot(f.x - me.x, f.z - me.z) > 70) continue; stepFoe(f, dt * fr); moveFig(f, dt * fr); f.hurtT = Math.max(0, f.hurtT - dt * fr); }
   for (const n of npcs) if (n.npc && !n.foe) { const dx = me.x - n.x, dz = me.z - n.z; if (Math.hypot(dx, dz) < 5) n.yaw += angWrap(Math.atan2(dx, dz) - n.yaw) * Math.min(1, dt * 3); }
-  stepProjectiles(dt); stepThings(dt); football.step(dt);
+  stepProjectiles(dt); stepThings(dt); football.step(dt); BOSS.step(dt);
   // the edge of the land: no one goes past it; and anyone who falls out of the world wakes on the last safe ground
   for (const f of [me, mate]) { f.x = clamp(f.x, 6, WW - 7); f.z = clamp(f.z, 6, DD - 7); }
   if (me.onGround && !me.inWater && G.clock - (player.safeT || 0) > 1) { player.safe = { x: me.x, y: me.y, z: me.z }; player.safeT = G.clock; }
@@ -529,9 +549,12 @@ function step(dt) {
   { const [gx, gz] = Wd.spots.gate; if (Math.hypot(gx + 0.5 - me.x, gz - 1 - me.z) < 3 && !S.flags.gateOpen) near = { kind: 'gate' }; }
   for (const s of Wd.signs) if (Math.hypot(s.x - me.x, s.z - me.z) < 2.2) near = near || { kind: 'sign', s };
   for (const t of TH) { if (!['chest', 'station', 'shrine'].includes(t.type) || (t.type === 'chest' && S.opened[t.id])) continue; if (Math.hypot(t.x - me.x, t.z - me.z) < 2.2 && Math.abs(t.y - me.y) < 2.5) near = { kind: t.type, t }; }
-  $('prompt').hidden = !near || !!dialog; if (near) $('prompt').textContent = (matchMedia('(pointer: coarse)').matches ? '' : 'E  ') + { npc: T('交談', 'Talk'), bell: T('敲鐘', 'Ring the bell'), chest: T('打開寶箱', 'Open the chest'), gate: T('天機閣之門', 'The Pavilion door'), sign: T('看石碑', 'Read'), station: T('驛站：騎馬', 'Post station: ride'), shrine: T('打坐休息', 'Meditate and rest') }[near.kind];
+  near = BOSS.nearFinish() || ACT.nearExec() || near;
+  $('prompt').hidden = !near || !!dialog; if (near) $('prompt').textContent = (matchMedia('(pointer: coarse)').matches ? '' : 'E  ') + { npc: T('交談', 'Talk'), bell: T('敲鐘', 'Ring the bell'), chest: T('打開寶箱', 'Open the chest'), gate: T('天機閣之門', 'The Pavilion door'), sign: T('看石碑', 'Read'), exec: T('終結技', 'Finish him'), finish: T('終結頭目！', 'Finish the boss!'), station: T('驛站：騎馬', 'Post station: ride'), shrine: T('打坐休息', 'Meditate and rest') }[near.kind];
   if (near && !dialog && pressed('KeyE')) {
     if (near.kind === 'npc') openDialog(near.id);
+    if (near.kind === 'exec') ACT.execute(near.f);
+    if (near.kind === 'finish') BOSS.finish(near.b);
     if (near.kind === 'bell') { S.bells[near.i] = true; SFX.gong(1); bellMeshes[near.i].material.color.set('#f0c858'); const n = G.bellsRung(); toast(T(`鐘聲　${n}/4`, `Bell ${n}/4`)); if (n === 4) { S.flags.bells = true; banner(T('四鐘齊鳴', 'All four bells have rung'), '#f0c858', T('回寺裡見苦禪大師', 'Return to Master Kuchan')); } save(); hud(); }
     if (near.kind === 'chest' && near.t) { const t = near.t; S.opened[t.id] = true; t.lid.rotation.x = -1.3; SFX.gong(0.4); if (t.gives === 'page') { const pg = Wd.pages.find((p) => !S.pages[p.id] && !p.fromChest); if (pg) { pg.fromChest = true; pg.x = t.x; pg.z = t.z + 0.9; pg.y = t.y; pg.mesh?.position.set(pg.x * VS, (pg.y + 0.9) * VS, pg.z * VS); } } drop('coin', t, t.gives === 'page' ? 6 : 12 + Math.floor(Math.random() * 10)); save(); }
     else if (near.kind === 'station') stationMenu(near.t);
@@ -543,9 +566,9 @@ function step(dt) {
   for (const p of Wd.pages) { if (S.pages[p.id] || !p.mesh) continue; p.mesh.rotation.y += dt * 2; p.mesh.position.y = (p.y + 0.9 + Math.sin(G.clock * 2 + p.x) * 0.15) * VS; if (Math.hypot(p.x - me.x, p.z - me.z) < 1.1 && me.y < p.y + 1.6 && me.y + me.h > p.y) { S.pages[p.id] = true; scene.remove(p.mesh); p.mesh = null; SFX.coin?.() || SFX.flick(); const n = Object.keys(S.pages).length; const before = player.maxHp; recalcMax(); if (player.maxHp > before) { player.hp = player.maxHp; banner(T('功力大增！', 'Your strength grows!'), '#ffe8a0', T(`秘笈 ${n}/${pagesN}・氣血上限提高`, `${n}/${pagesN} pages · more health`)); } else toast(T(`秘笈殘頁 ${n}/${pagesN}`, `Manual page ${n}/${pagesN}`)); save(); hud(); } }
   // ---- the land you are in
   const rg = regionAt(me.x, me.z); if (rg !== region) { region = rg; if (rg) { const b = $('place'); b.textContent = rg.name[lang]; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); } SFX.ambience(rg?.amb || 'wind'); music.mood(rg?.id || 'open'); }
-  music.fight(foes.some((f) => f.alive && f.state === 'chase' && Math.hypot(f.x - me.x, f.z - me.z) < 16) || !!xiao?.foe || !!masked?.foe);
+  music.fight(foes.some((f) => f.alive && f.state === 'chase' && Math.hypot(f.x - me.x, f.z - me.z) < 16) || !!xiao?.foe || !!masked?.foe || !!BOSS.active());
   // ---- everyone posed, the effects, the studs near you, the light of the hour
-  for (const f of figs) { if (Math.hypot(f.x - me.x, f.z - me.z) > 90) { f.F.root.visible = false; continue; } if (!f.ko || f.koT < 4) f.F.root.visible = true; poseFig(f, dt, G.clock); }
+  for (const f of figs) { if (Math.hypot(f.x - me.x, f.z - me.z) > 90) { f.F.root.visible = false; continue; } if (!f.ko || f.koT < 4) f.F.root.visible = true; poseFig(f, dt * (f.foe ? fr : 1), G.clock); }
   const tip = me.hero.tip ? me.hero.tip.getWorldPosition(V3()) : V3(me.x, me.y + 1, me.z).multiplyScalar(VS), base = me.hero.base ? me.hero.base.getWorldPosition(V3()) : tip;
   const A = me.anim?.special ? me.anim : null, M = me.special, t = A?.t || 0;
   fx.update(dt, G.clock, { tip, base, glow: A && M.glow ? keyCurve(M.glow, t) : 0, gather: A && M.gather && t > M.gather[0] && t < M.gather[1] ? Math.sin(Math.PI * (t - M.gather[0]) / (M.gather[1] - M.gather[0])) : 0, cutting: !!(A && M.trail && t > M.trail[0] && t < M.trail[1]), feet: V3(me.x, me.y, me.z).multiplyScalar(VS), tint: me.CH.id === 'yishuo' ? [0.4, 1.2, 0.8] : undefined });
@@ -566,5 +589,5 @@ function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now;
 // ---------------------------------------------------------------- start
 $('loading').hidden = true; hud(); requestAnimationFrame((t) => { last = t; loop(t); });
 if (!S.flags.metMonkey) setTimeout(() => { banner(T('龍門江湖', 'The Rivers and Lakes of Longmen'), '#f0c858', T('父親被誣陷下獄，兄弟倆踏上逃亡之路……', 'Their father framed and jailed, the brothers take to the road…')); }, 600);
-window.GAME = { S, G, keys, player, projs, fx, camera, me: () => me, mate: () => mate, heroes, foes, Wd, V, tp(x, z) { me.x = x + 0.5; me.z = z + 0.5; me.y = V.top(Math.floor(x), Math.floor(z)) + 0.5; mate.x = me.x + 1; mate.z = me.z; mate.y = me.y; }, setTod(t) { tod = t; }, cam, step, render() { placeCamera(1); const back = clearLens(); R.render(scene, camera); back(); }, openDialog, TH, choice: () => choice, football };
+window.GAME = { ACT, BOSS, S, G, keys, player, projs, fx, camera, me: () => me, mate: () => mate, heroes, foes, Wd, V, tp(x, z) { me.x = x + 0.5; me.z = z + 0.5; me.y = V.top(Math.floor(x), Math.floor(z)) + 0.5; mate.x = me.x + 1; mate.z = me.z; mate.y = me.y; }, setTod(t) { tod = t; }, cam, step, render() { placeCamera(1); const back = clearLens(); R.render(scene, camera); back(); }, openDialog, TH, choice: () => choice, football };
 window.DONE = true;

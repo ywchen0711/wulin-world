@@ -20,7 +20,7 @@ const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a
 
 export const P = { // the places, as [x, z] in bricks
   manor: [400, 492], village: [392, 592], town: [504, 344], bamboo: [184, 444], lake: [624, 600], temple: [208, 192], cliff: [704, 196], fort: [184, 652], falls: [400, 34], start: [428, 420],
-  fishing: [560, 690], inn: [270, 520], bridge: [610, 250], ruins: [560, 470], tea: [300, 260], plum: [480, 700], cave: [80, 560], post: [[428, 432], [214, 470], [640, 330], [400, 120], [240, 640], [560, 650]],
+  fishing: [560, 690], inn: [270, 520], bridge: [610, 250], ruins: [560, 470], tea: [300, 260], plum: [480, 700], cave: [80, 560], arena: [446, 236], post: [[428, 432], [214, 470], [640, 330], [400, 120], [240, 640], [560, 650]],
 };
 export const REGIONS = [
   { id: 'manor', at: P.manor, r: 48, name: { zh: '龍門刀莊', en: 'Longmen Saber Manor' }, amb: 'birds' },
@@ -31,6 +31,7 @@ export const REGIONS = [
   { id: 'temple', at: P.temple, r: 74, name: { zh: '千佛寺', en: 'Temple of a Thousand Buddhas' }, amb: 'wind' },
   { id: 'cliff', at: P.cliff, r: 64, name: { zh: '暴龍崖', en: 'Tyrant Dragon Cliff' }, amb: 'wind' },
   { id: 'fort', at: P.fort, r: 64, name: { zh: '黑風寨', en: 'Black Wind Fort' }, amb: 'wind' },
+  { id: 'arena', at: P.arena, r: 26, name: { zh: '戰神台', en: 'The War God’s Platform' }, amb: 'wind' },
   { id: 'fishing', at: P.fishing, r: 40, name: { zh: '漁村', en: 'Fishing Village' }, amb: 'wind' },
   { id: 'inn', at: P.inn, r: 28, name: { zh: '悅來客棧', en: 'The Yuelai Inn' }, amb: 'birds' },
   { id: 'bridge', at: P.bridge, r: 30, name: { zh: '斷橋', en: 'The Broken Bridge' }, amb: 'wind' },
